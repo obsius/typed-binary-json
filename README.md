@@ -1,6 +1,7 @@
 # Typed Binary JSON
 
-Typed Binary JSON or TBJSON, is a binary serialization format that is compatible with JSON. It stores known object prototypes in a JSON header, and serialized the data in binary following the header. Typed Binary JSON is useful for known object or class types, otherwise it will offer no advantage in terms of size of performance over JSON.
+Typed Binary JSON or TBJSON, is a binary serialization format that is compatible with JSON. It stores known object prototypes in a JSON header, and serializes the data in binary following the header.  
+Typed Binary JSON is useful for known object or class types, otherwise it will offer no advantage in terms of size of performance over JSON.
 
 
 ## Format
@@ -17,7 +18,7 @@ Each file starts off with ".tbj" to singinify that it is a Typed Binary JSON fil
 ```
 
 Offset | Value | Meaning
--|-
+-|-|-
 0 | .tbj | States that file type.
 4 | uint32 | Size of the JSON header.
 8 | JSON | A JSON representation of the binary data to follow.
