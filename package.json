@@ -1,0 +1,48 @@
+{
+	"name": "typed-binary-json",
+	"version": "1.0.0",
+	"description": "A TBJSON parser and serializer.",
+	"author": "Jeff Seaman",
+	"contributors": [
+		"Jeff Seaman <mr.jeffrey.seaman@gmail.com> (https://www.ngc6822.com)"
+	],
+	"license": "MIT",
+	"main": "index.js",
+	"scripts": {
+		"prepare": "babel src -d lib"
+	},
+	"babel": {
+		"plugins": [
+			"transform-runtime",
+			[
+				"babel-plugin-root-import",
+				{
+					"rootPathSuffix": "src/",
+					"rootPathPrefix": "~"
+				}
+			]
+		],
+		"presets": [
+			"env",
+			"stage-2"
+		]
+	},
+	"devDependencies": {
+		"babel-cli": "^6.26.0",
+		"babel-plugin-root-import": "^6.1.0",
+		"babel-plugin-transform-runtime": "^6.23.0",
+		"babel-preset-env": "^1.7.0",
+		"babel-preset-stage-2": "^6.24.1",
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/obsius/typed-binary-json.git"
+	},
+	"keywords": [
+		"json",
+		"binary",
+		"typed",
+		"parser",
+		"serializer"
+	]
+}
