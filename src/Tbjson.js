@@ -1,7 +1,9 @@
-import fs from 'fs';
+import fs, { writeSync } from 'fs';
 
-// stamp for file type
-const STAMP = '.tbj';
+// magic number for file type
+const MAGIC_NUMBER = '.tbj';
+const SIZE_MAGIC_NUMBER = 8;
+
 
 // types
 const NULL =    0;
@@ -33,19 +35,32 @@ const SIZE_UINT32 =  4;
 const SIZE_FLOAT32 = 4;
 const SIZE_FLOAT64 = 8;
 
-const CUSTOM_TYPE_OFFSET = 128;
+const TYPE_OFFSET =  32;
+const CLASS_OFFSET = 64;
+const ARRAY_OFFSET = 512;
+
+// defaults
+const DEFAULT_STR_ENCODING = 'utf-8';
+const DEFAULT_NUM_ENCODING = FLOAT64;
+const DEFAULT_BUFFER_SIZE = 1048576;
 
 /**
  * Tbjson
  */
 export default class Tbjson {
 	
+	refs = {};
+
 	classes = {};
 	types = {};
+
+	nextTypeCode = TYPE_OFFSET;
+	nextClassCode = CLASS_OFFSET;
+
 	options = {
-		encStringAs: 'utf-8',
-		encNumberAs: 'float32',
-		bufferSize: 65536
+		encStringAs: DEFAULT_STR_ENCODING,
+		encNumberAs: DEFAULT_NUM_ENCODING,
+		bufferSize: DEFAULT_BUFFER_SIZE
 	};
 	
 	constructor(types = [], options = {}) {
@@ -58,6 +73,10 @@ export default class Tbjson {
 			...this.options,
 			...options
 		};
+	}
+
+	registerConstructor(c) {
+
 	}
 	
 	registerType(type) {
@@ -72,39 +91,83 @@ export default class Tbjson {
 	
 	serialize(stream, obj) {
 		
-		// make a buffer
-		this.buffer = new StreamBufferWriter(stream, this.options.bufferSize);
-
-		// write out the stamp
-		this.buffer.write(STRING, STAMP);
+		// make a writer
+		this.writer = new StreamBufferWriter(stream, this.options.bufferSize);
 
 		// process the obj
-		this.header = this.process(obj);
-
-		// write out the header
-		this.buffer.write(STRING, JSON.stringify(this.header));
+		this.header = {
+			classes: this.classes,
+			root: this.process(obj)
+		};
 		
 		// flush and cleanup
-		this.buffer.flush();
-		this.buffer = null;
+		this.writer.flush();
+		this.writer = null;
 	}
 
 	serializeToFile(filename, obj) {
-		let stream = fs.createWriteStream(filename, 'binary');
-		this.serialize(stream, obj);
-		stream.end();
+		return new Promise((res, rej) => {
+			try {
+				let tempFilename = `${filename}.tmp`;
+
+				// write the data to a tmp file
+				let writeStream = fs.createWriteStream(tempFilename, 'binary');
+				this.serialize(writeStream, obj);
+				writeStream.end();
+
+				// write the final file
+				writeStream = fs.createWriteStream(filename, 'binary');
+
+				let headerString = JSON.stringify(this.header);
+
+				let headerLengthBuffer = Buffer.allocUnsafe(4);
+				headerLengthBuffer.writeUInt32LE(headerString.length);
+
+				// write out the magic number, header length, and header
+				writeStream.write(MAGIC_NUMBER, 'utf-8');
+				writeStream.write(headerLengthBuffer);
+				writeStream.write(headerString, 'utf-8');
+
+				// pipe the tmp file to the final file
+				let readStream = fs.createReadStream(tempFilename, 'binary');
+				readStream.pipe(writeStream);
+
+				readStream.on('end', () => {
+
+					// cleanup
+					fs.unlinkSync(tempFilename);
+
+					res();
+				});
+			} catch (e) {
+				rej(new Error(`Tbjson Failed to serialize object to "${filename}: ` + e));
+			}
+		});
 	}
 	
 	parse(stream) {
-		
-		let buffer;
-		
-		stream.on('data', (chunk) => {
-			console.log(chunk.length);
-		});
-		
-		stream.on('end', () => {
-			
+		return new Promise((res, rej) => {
+			let reader = new StreamBufferReader(stream);
+
+			reader.read(SIZE_MAGIC_NUMBER, (data) => {
+				if (data.toString() != MAGIC_NUMBER) {
+					console.log(data);
+					//reader.dispose();
+					rej(new Error('Stream is not a Typed Binary JSON format'));
+				} else {
+					reader.read(SIZE_INT32, (data) => {
+						let headerEnd = data.readInt32LE(0);
+
+						reader.read(headerEnd - (SIZE_MAGIC_NUMBER + SIZE_INT32), (data) => {
+							let header = data.toJSON();
+
+							console.log(header);
+							res(header);
+
+						});
+					});
+				}
+			});
 		});
 	}
 
@@ -114,66 +177,100 @@ export default class Tbjson {
 
 	/* private */
 
-	// TODO diff between ref and def
-	addDef(ref, def) {
-		switch (typeof subDef) {
-			case 'string':
+	fmtDef(def) {
+		switch (typeof def) {
+			case 'number':
+				return def;		
 
-				return [subDef];
+			case 'string':
+				if (this.refs[def]) { return this.refs[def]; }
+				this.refs[def] = this.nextClassCode++;
+				return this.refs[def];
 
 			case 'object':
-				if (Array.isArray(subDef)) {
-					return subDef;
-				} else {
-					let 
-					for (let key in def) {
-						let subDef = def[key];
-						return formatDef;
+				if (Array.isArray(def)) {
+					if (def.length == 2 && def[0] == ARRAY) {
+						return ARRAY_OFFSET + this.fmtDef(def[1]);
+					} else {
+						let fmtDef = [];
+
+						for (let i = 0; i < def.length; ++i) {
+							fmtDef.push(this.fmtDef(def[i]));
+						}
+
+						return fmtDef;
 					}
+
+				} else {
+
+					let fmtDef = {};
+
+					for (let key in def) {
+						fmtDef[key] = this.fmtDef(def[key]);
+					}
+
+					return fmtDef;
 				}
-				break;
 
 			case 'number':
 			case 'boolean':
 				// invalid
 				break;
 		}
+	}
 
+	addClass(obj) {
+		let template = obj.constructor.tbjson;
+		let code = this.refs[template.ref];
+
+		// assign a new reference and definition
+		if (!code) {
+			code = this.nextClassCode++;
+			this.refs[template.ref] = code;
+		}
+
+		// this reference has not been defined, so set the definition
+		if (!this.classes[code]) {
+			this.classes[code] = this.fmtDef(template.def);
+		}
+
+		return code;
 	}
 
 	processDef(obj, def) {
 
-		// is a primitive
+	//	console.log("o", obj);
+	//	console.log("d", def);
+	//	console.log("-------");
+
+		// is typed
 		if (typeof def == 'number') {
-			this.buffer.write(def, obj);
-			if (def == STRING) { this.buffer.write(NULL); }
+
+			// is variable-length fixed typed array 
+			if (def > ARRAY_OFFSET) {
+				for (let i = 0; i < obj.length; ++i) {
+					this.processDef(obj[i], def ^ ARRAY_OFFSET);
+				}
+				this.writer.write(NULL);
+
+			// class object
+			} else if (def > CLASS_OFFSET) {
+				this.addClass(obj);
+				this.processDef(obj, this.classes[def]);
+
+			// is primitive
+			} else {
+				this.writer.write(def, obj);
+				if (def == STRING) { this.writer.write(NULL); }
+			}
 
 		// is a sub object or array
 		} else {
 
-			// is def or array
+			// is fixed-length variable type array
 			if (Array.isArray(def)) {
-
-				// is fixed-length variable type array
-				if (Array.isArray(def[0])) {
-					for (let i = 0; i < def.length; ++i) {
-						processDef(obj[i], def[i]);
-					}
-
-				// is variable-length fixed typed array
-				} else if (def[0] == ARRAY) {
-					for (let i = 0; i < obj.length; ++i) {
-						processDef(obj[i], def[0]);
-					}
-					this.buffer.write(NULL);
-
-				// is custom
-				} else if (def[0] == CUSTOM) {
-					this.processDef(obj, this.classes[def[1]]);
-
-				// is def
-				} else {
-					this.processDef(obj, def[0]);
+				for (let i = 0; i < def.length; ++i) {
+					this.processDef(obj[i], def[i]);
 				}
 
 			// is a sub object
@@ -188,42 +285,40 @@ export default class Tbjson {
 	process(obj) {
 		switch (typeof obj) {
 			case 'boolean':
-				this.buffer.write(BOOL, obj);
+				this.writer.write(BOOL, obj);
 				return BOOL;
 
-			case 'string':
-				this.buffer.write(STRING, obj);
-				return [STRING, obj.length];
-
 			case 'number':
-				this.buffer.write(FLOAT32, obj);
+				this.writer.write(FLOAT32, obj);
 				return FLOAT32;
+
+			case 'string':
+				this.writer.write(STRING, obj);
+				return [STRING, obj.length];
 
 			case 'object':
 				if (Array.isArray(obj)) {
 
 					let refs = [];
 
-					for (let item of obj) {
-						refs.push(this.process(item));
+					for (let i = 0; i < obj.length; ++i) {
+						refs.push(this.process(obj[i]));
 					}
 
 					return refs;
 
 				} else {
 
+					// the object is a known tbjson class
 					if (obj.constructor && obj.constructor.tbjson) {
 
-						let ref = obj.constructor.tbjson.ref;
-						let def = obj.constructor.tbjson.def
+						// add this object type to the known classes
+						let code = this.addClass(obj);
 
-						if (!this.classes[ref]) {
-							this.addDef(ref, def);
-						}
+						// process the class
+						this.processDef(obj, this.classes[code]);
 
-						this.processDef(obj, obj.constructor.tbjson.def);
-
-						return ref;
+						return code;
 					}
 
 					let ref = {};
@@ -245,13 +340,14 @@ Tbjson.TYPES = { BYTE, BOOL, INT8, UINT8, INT16, UINT16, INT32, UINT32, FLOAT32,
 
 class StreamBufferWriter {
 
-	constructor(stream, size = 16384, xFactor = 2) {
+	streamIndex = 0;
+	streamReady = true;
+	offset = 0;
 
+	constructor(stream, size = 16384, xFactor = 2) {
 		this.stream = stream;
 		this.buffer = Buffer.allocUnsafe(size);
-		this.xFactor = 2;
-
-		this.offset = 0;
+		this.xFactor = xFactor;
 	}
 
 	get size() {
@@ -259,17 +355,21 @@ class StreamBufferWriter {
 	}
 
 	flush() {
-		this.streamReady = false;
 
-		this.stream.write(this.buffer.slice(0, this.offset), (rdy) => {
+		this.streamReady = this.stream.write(this.buffer.slice(this.streamIndex, this.offset), () => {
 			this.streamReady = true;
 		});
 
-		this.offset = 0;
+		if (this.streamReady) {
+			this.offset = 0;
+			this.streamIndex = 0;
+		} else {
+			this.streamIndex = this.offset;
+		}
 	}
 
 	resize() {
-		this.buffer = Buffer.concat(this.buffer, Buffer.allocUnsafe(this.size * Math.floor(this.xFactor / 2)));
+		this.buffer = Buffer.concat([this.buffer, Buffer.allocUnsafe(this.size * Math.floor(this.xFactor / 2))]);
 	}
 
 	checkFlush(length) {
@@ -286,7 +386,7 @@ class StreamBufferWriter {
 		switch (type) {
 			case NULL:
 				this.checkFlush(SIZE_NULL);
-				this.buffer.writeByte(0, this.offset++);
+				this.buffer.writeUInt8(0, this.offset);
 				this.offset += SIZE_NULL;
 				break;
 
@@ -300,6 +400,79 @@ class StreamBufferWriter {
 				this.checkFlush(val.length);
 				this.buffer.write(val, this.offset, val.length, 'utf-8');
 				this.offset += val.length;
+		}
+	}
+}
+
+
+class StreamBufferReader {
+
+	constructor(stream, size = 8388608) {
+
+		this.stream = stream;
+		this.size = size;
+		this.tempSize = size;
+
+		this.buffer = Buffer.allocUnsafe(size);
+
+		this.writeOffset = 0;
+		this.readOffset = 0;
+
+		this.stream.on('data', (chunk) => {
+			if (this.writeOffset + chunk.length > this.tempSize) {
+				this.stream.pause();
+			}
+
+			this.buffer.fill(chunk, this.writeOffset, this.writeOffset + chunk.length);
+			
+			if (this.waitingRead) {
+				this.waitingRead();
+			}
+		});
+	}
+
+	readUntilNull(fn) {
+		for (let i = this.readOffset; i < this.buffer.length; ++i) {
+			if (this.buffer[i] == null) {
+				fn(this.buffer.slice(this.offset, i));
+				this.incOffset(i - this.readOffset);
+			}
+		}
+	}
+
+	read(length, fn) {
+
+		if (this.offset + length > this.buffer.length) {
+
+			if (this.size < this.offset + length) {
+				this.tmpSize = this.offset + length;
+			}
+			
+			this.waitingRead = () => {
+				this.tempSize = this.size;
+				this.read(length, fn)
+			};
+		} else {
+			fn(this.buffer.slice(this.offset, length));
+			this.incOffset(length);
+		}
+	}
+
+	/* private */
+
+	incOffset(length) {
+		this.readOffset += length;
+
+		if (this.readOffset > this.size) {
+
+			this.writeOffset = this.buffer.length - this.writeOffset;
+			this.readOffset = 0;
+
+			this.newBuffer = Buffer.allocUnsafe(this.size);
+			this.newBuffer.fill(this.offset, this.buffer.length);
+			this.buffer = this.newBuffer;
+
+			if (this.stream.isPaused()) { this.stream.resume(); }
 		}
 	}
 }
@@ -339,7 +512,7 @@ class B {
 	constructor() {
 
 		this.as = [];
-		for (let i = 0; i < 1000000; ++i) {
+		for (let i = 0; i < 100; ++i) {
 			this.as.push(new A());
 		}
 
@@ -364,16 +537,21 @@ for (let i = 0; i < 10; ++i) {
 	x.e.push(i);
 }
 
-console.time();
+console.log("STARTING");
 
-//fs.writeFileSync("test.kk", JSON.stringify(x));
+(async function() {
 
-tbjson.serializeToFile('example.tbj', x);
+	console.time();
 
-//tbjson.process(x);
+	//fs.writeFileSync("test.kk", JSON.stringify(x));
 
-//tbjson.parseFile('example.tbj');
+	//await tbjson.serializeToFile('example.tbj', x);
 
-//setTimeout(() => {}, 5000);
+	//tbjson.process(x);
 
-console.timeEnd();
+	let data = tbjson.parseFile('example.tbj');
+	console.log(data);
+
+	console.timeEnd();
+
+})();
