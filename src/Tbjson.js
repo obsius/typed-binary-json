@@ -24,12 +24,12 @@ import {
 	ARRAY_OFFSET
 } from './constants';
 
+import BufferWriter from './BufferWriter';
 import BufferReader from './BufferReader';
 import StreamBufferWriter from './StreamBufferWriter';
 import StreamBufferReader from './StreamBufferReader';
 import { SIZE_UINT32 } from '../lib/constants';
 
-// defaults
 const DEFAULT_STR_ENCODING = 'utf-8';
 const DEFAULT_NUM_ENCODING = FLOAT64;
 const DEFAULT_BUFFER_SIZE = 1048576;
@@ -40,9 +40,9 @@ const DEFAULT_BUFFER_SIZE = 1048576;
 export default class Tbjson {
 	
 	refs = {};
-
 	classes = {};
 	types = {};
+	root = null;
 
 	nextTypeCode = TYPE_OFFSET;
 	nextClassCode = CLASS_OFFSET;
@@ -79,66 +79,105 @@ export default class Tbjson {
 		}	
 	}
 
-	// TODO FINISH THIS!
-	serializeToBuffer(obj) {
-		
-		// make a writer
-		this.writer = new BufferWriter(stream, this.options.bufferSize);
-
-		// process the obj
-		let header = {
+	getHeader() {
+		return {
 			refs: this.refs,
 			classes: this.classes,
-			root: this.serialize(obj)
+			types: this.types,
+			root: this.root
 		};
+	}
 
-		let headerString = JSON.stringify(header);
+	getHeaderAsBuffer() {
+		try {
 
-		let buffer = Buffer.allocUnsafe(SIZE_MAGIC_NUMBER + SIZE_UINT32 + headerString.length);
-		buffer.write(STRING, MAGIC_NUMBER);
+			// header string
+			let headerStr = JSON.stringify(this.getHeader());
+
+			// make a new buffer, add the header, append the binary
+			let buffer = new BufferWriter(SIZE_MAGIC_NUMBER + SIZE_UINT32 + headerStr.length);
+
+			// str - magic number
+			buffer.writeFixedLengthString(MAGIC_NUMBER);
+
+			// uint32 - header length
+			buffer.write(UINT32, headerStr.length);
+
+			// str - header
+			buffer.writeFixedLengthString(headerStr);
+
+			return buffer.buffer;
+
+		} catch (e) {
+			throw new Error('Tbjson failed to create a buffer for the header: ' + e);
+		}
+	}
+
+	parseHeader(headerStr) {
+		try {
+
+			let header = JSON.parse(headerStr);
+
+			this.refs = header.refs;
+			this.classes = header.classes;
+			this.types = header.types;
+			this.root = header.root;
+
+		} catch (e) {
+			throw new Error('Tbjson failed to parse header string: ' + e);
+		}
+	}
+
+	serializeToBuffer(obj) {
+		try {
+
+			// make a writer
+			this.writer = new BufferWriter(this.options.bufferSize);
+
+			// process the obj
+			this.root = this.serialize(obj);
+
+			// add the header to the front
+			return Buffer.concat([this.getHeaderAsBuffer(), this.writer.getBuffer()]);
+
+		} catch(e) {
+			throw new Error('Tbjson failed to serialize to the buffer: ' + e);
+		}
 	}
 	
 	serializeToStream(stream, obj) {
-		
-		// make a writer
-		this.writer = new StreamBufferWriter(stream, this.options.bufferSize);
+		try {
 
-		// process the obj
-		let header = {
-			refs: this.refs,
-			classes: this.classes,
-			root: this.serialize(obj)
-		};
-		
-		// flush and cleanup
-		this.writer.flush();
-		this.writer = null;
+			// make a writer
+			this.writer = new StreamBufferWriter(stream, this.options.bufferSize);
 
-		return header;
+			// process the obj
+			this.root = this.serialize(obj);
+			
+			// flush and cleanup
+			this.writer.flush();
+			this.writer = null;
+		} catch (e) {
+			throw new Error('Tbjson failed to serialize to the stream: ' + e);
+		}
 	}
 
 	serializeToFile(filename, obj) {
 		return new Promise((res, rej) => {
 			try {
+
 				let tempFilename = `${filename}.tmp`;
 
 				// write the data to a tmp file
 				let writeStream = fs.createWriteStream(tempFilename, 'binary');
-				let header = this.serializeToStream(writeStream, obj);
+				this.serializeToStream(writeStream, obj);
 				writeStream.end();
 
 				// write the final file
 				writeStream = fs.createWriteStream(filename, 'binary');
 
-				let headerString = JSON.stringify(header);
-
-				let headerLengthBuffer = Buffer.allocUnsafe(4);
-				headerLengthBuffer.writeUInt32LE(headerString.length);
-
-				// write out the magic number, header length, and header
-				writeStream.write(MAGIC_NUMBER, 'utf-8');
-				writeStream.write(headerLengthBuffer);
-				writeStream.write(headerString, 'utf-8');
+				// write the header
+				writeStream.write(this.getHeaderAsBuffer());
 
 				// pipe the tmp file to the final file
 				let readStream = fs.createReadStream(tempFilename, 'binary');
@@ -152,11 +191,12 @@ export default class Tbjson {
 					res();
 				});
 			} catch (e) {
-				rej(new Error(`Tbjson Failed to serialize object to "${filename}: ` + e));
+				rej(new Error(`Tbjson Failed to serialize object to "${filename}": ` + e));
 			}
 		});
 	}
 	
+	// TODO: doesn't work
 	parseStream(stream) {
 		return new Promise(async (res, rej) => {
 
@@ -171,10 +211,7 @@ export default class Tbjson {
 			let headerLength = await this.reader.read(UINT32);
 
 			// read and parse the header
-			let header = JSON.parse(await this.reader.read(STRING, headerLength));
-			this.refs = header.refs;
-			this.classes = header.classes;
-			this.root = header.root;
+			this.parseHeader(await this.reader.read(STRING, headerLength));
 
 			// construct the object
 			res(await this.parse(this.root));
@@ -182,29 +219,32 @@ export default class Tbjson {
 	}
 
 	parseBuffer(buffer) {
-		this.reader = new BufferReader(buffer);
+		try {
 
-		// validate the buffer type
-		if (this.reader.read(STRING, SIZE_MAGIC_NUMBER) != MAGIC_NUMBER) {
-			throw new Error('Buffer is not a Typed Binary JSON format');
+			this.reader = new BufferReader(buffer);
+
+			// validate the buffer type
+			if (this.reader.read(STRING, SIZE_MAGIC_NUMBER) != MAGIC_NUMBER) {
+				throw new Error('Buffer is not a Typed Binary JSON format');
+			}
+
+			// get the header length
+			let headerLength = this.reader.read(UINT32);
+
+			// read and parse the header
+			this.parseHeader(this.reader.read(STRING, headerLength));
+
+			// construct the object
+			return this.parse(this.root);
+
+		} catch(e) {
+			throw new Error('Tbjson failed to parse the buffer: ' + e);
 		}
-
-		// get the header length
-		let headerLength = this.reader.read(UINT32);
-
-		// read and parse the header
-		let header = JSON.parse(this.reader.read(STRING, headerLength));
-		this.refs = header.refs;
-		this.classes = header.classes;
-		this.root = header.root;
-
-		// construct the object
-		return this.parse(this.root);
 	}
 
 	async parseFileAsStream(filename) {
 		try {
-			return await this.parse(fs.createReadStream(filename));
+			return await this.parseStream(fs.createReadStream(filename));
 		} catch (e) {
 			throw new Error(`Tbjson failed to parse "${filename}": ` + e);
 		}
@@ -217,6 +257,8 @@ export default class Tbjson {
 			throw new Error(`Tbjson failed to parse "${filename}": ` + e);
 		}
 	}
+
+	/* private */
 
 	parse(def) {
 
@@ -264,8 +306,6 @@ export default class Tbjson {
 			return obj;
 		}
 	}
-
-	/* private */
 
 	fmtDef(def) {
 		switch (typeof def) {

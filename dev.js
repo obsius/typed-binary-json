@@ -21,7 +21,7 @@ class B {
 	as = [];
 
 	constructor() {
-		for (let i = 0; i < 10000; ++i) {
+		for (let i = 0; i < 100; ++i) {
 			this.as.push(new A());
 		}
 	}
@@ -41,10 +41,15 @@ let root = new B();
 		console.time();
 
 		let data;
+		let buffer;
 
 		//await tbjson.serializeToFile('tbjson.tbj', root);
 
-		data = tbjson.parseFileAsBuffer('tbjson.tbj');
+		buffer = tbjson.serializeToBuffer(root);
+		console.log(buffer.toString());
+		data = tbjson.parseBuffer(buffer);
+
+		//data = tbjson.parseFileAsBuffer('tbjson.tbj');
 
 		//console.log(data);
 		//console.log(JSON.stringify(data));

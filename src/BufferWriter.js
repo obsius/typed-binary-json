@@ -22,21 +22,35 @@ import {
 	SIZE_FLOAT64,
 } from './constants';
 
+const DEFAULT_BUFFER_SIZE = 16384;
+const DEFAULT_X_FACTOR = 2;
+const DEFAULT_STR_ENCODING = 'utf-8';
+
 export default class BufferWriter {
 
 	offset = 0;
 
-	constructor(size = 16384, xFactor = 2) {
+	constructor(size = DEFAULT_BUFFER_SIZE, xFactor = DEFAULT_X_FACTOR, strEncoding = DEFAULT_STR_ENCODING) {
 		this.buffer = Buffer.allocUnsafe(size);
 		this.xFactor = xFactor;
+		this.strEncoding = strEncoding;
 	}
 
 	get size() {
 		return this.buffer.length;
 	}
 
+	getBuffer() {
+		return this.buffer.slice(0, this.offset);
+	}
+
 	resize() {
 		this.buffer = Buffer.concat([this.buffer, Buffer.allocUnsafe(this.size * Math.floor(this.xFactor / 2))]);
+	}
+
+	writeFixedLengthString(val) {
+		this.buffer.write(val, this.offset, val.length, this.strEncoding);
+		this.offset += val.length;
 	}
 
 	write(type, val) {
@@ -47,50 +61,67 @@ export default class BufferWriter {
 			case BYTE:
 			case BOOL:
 			case UINT8:
+				this.checkSize(SIZE_UINT8);
 				this.buffer.writeUInt8(val, this.offset);
 				this.offset += SIZE_UINT8;
 				break;
 
 			case INT8:
+				this.checkSize(SIZE_INT8);
 				this.buffer.writeInt8(val, this.offset);
 				this.offset += SIZE_INT8;
 				break;
 
 			case UINT16:
+				this.checkSize(SIZE_UINT16);
 				this.buffer.writeUInt16LE(val, this.offset);
 				this.offset += SIZE_UINT16;
 				break;
 
 			case INT16:
+				this.checkSize(SIZE_INT16);
 				this.buffer.writeInt16LE(val, this.offset);
 				this.offset += SIZE_INT16;
 				break;
 
 			case UINT32:
+				this.checkSize(SIZE_UINT32);
 				this.buffer.writeUInt32LE(val, this.offset);
 				this.offset += SIZE_UINT32;
 				break;
 
 			case INT32:
+				this.checkSize(SIZE_INT32);
 				this.buffer.writeInt32LE(val, this.offset);
 				this.offset += SIZE_INT32;
 				break;
 
 			case FLOAT32:
+				this.checkSize(SIZE_FLOAT32);
 				this.buffer.writeFloatLE(val, this.offset);
 				this.offset += SIZE_FLOAT32;
 				break;
 
 			case FLOAT64:
+				this.checkSize(SIZE_FLOAT64);
 				this.buffer.writeDoubleLE(val, this.offset);
 				this.offset += SIZE_FLOAT64;
 				break;
 
 			case STRING:
-				this.buffer.write(val, this.offset, val.length, 'utf-8');
+				this.checkSize(val.length + SIZE_UINT8);
+				this.buffer.write(val, this.offset, val.length, this.strEncoding);
 				this.offset += val.length;
 				this.buffer.writeUInt8(0, this.offset);
 				this.offset += SIZE_UINT8;
+		}
+	}
+
+	/* private */
+
+	checkSize(size) {
+		if (this.offset + size > this.size) {
+			this.resize();
 		}
 	}
 }
