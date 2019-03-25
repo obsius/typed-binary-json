@@ -1,6 +1,6 @@
 {
 	"name": "typed-binary-json",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"description": "A TBJSON parser and serializer.",
 	"author": "Jeff Seaman",
 	"contributors": [
@@ -10,7 +10,7 @@
 	"main": "index.js",
 	"scripts": {
 		"prepare": "babel src -d lib",
-		"start": "nodemon --inspect src/Tbjson.js --exec babel-node",
+		"start": "nodemon --inspect dev.js --exec babel-node",
 		"benchmarks": "babel-node benchmarks.js"
 	},
 	"babel": {
