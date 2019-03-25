@@ -27,6 +27,7 @@ import {
 import BufferReader from './BufferReader';
 import StreamBufferWriter from './StreamBufferWriter';
 import StreamBufferReader from './StreamBufferReader';
+import { SIZE_UINT32 } from '../lib/constants';
 
 // defaults
 const DEFAULT_STR_ENCODING = 'utf-8';
@@ -77,6 +78,25 @@ export default class Tbjson {
 			this.registerType(obj);
 		}	
 	}
+
+	// TODO FINISH THIS!
+	serializeToBuffer(obj) {
+		
+		// make a writer
+		this.writer = new BufferWriter(stream, this.options.bufferSize);
+
+		// process the obj
+		let header = {
+			refs: this.refs,
+			classes: this.classes,
+			root: this.serialize(obj)
+		};
+
+		let headerString = JSON.stringify(header);
+
+		let buffer = Buffer.allocUnsafe(SIZE_MAGIC_NUMBER + SIZE_UINT32 + headerString.length);
+		buffer.write(STRING, MAGIC_NUMBER);
+	}
 	
 	serializeToStream(stream, obj) {
 		
@@ -84,7 +104,7 @@ export default class Tbjson {
 		this.writer = new StreamBufferWriter(stream, this.options.bufferSize);
 
 		// process the obj
-		this.header = {
+		let header = {
 			refs: this.refs,
 			classes: this.classes,
 			root: this.serialize(obj)
@@ -93,6 +113,8 @@ export default class Tbjson {
 		// flush and cleanup
 		this.writer.flush();
 		this.writer = null;
+
+		return header;
 	}
 
 	serializeToFile(filename, obj) {
@@ -102,13 +124,13 @@ export default class Tbjson {
 
 				// write the data to a tmp file
 				let writeStream = fs.createWriteStream(tempFilename, 'binary');
-				this.serializeToStream(writeStream, obj);
+				let header = this.serializeToStream(writeStream, obj);
 				writeStream.end();
 
 				// write the final file
 				writeStream = fs.createWriteStream(filename, 'binary');
 
-				let headerString = JSON.stringify(this.header);
+				let headerString = JSON.stringify(header);
 
 				let headerLengthBuffer = Buffer.allocUnsafe(4);
 				headerLengthBuffer.writeUInt32LE(headerString.length);
