@@ -172,7 +172,7 @@ Tested on a SSD, 16 GB, and a E3-1505M @ 2.8 GHz machine.
 ```
 
 Benchmark | Filesize | Time
--|-
+-|-|-
 JSON Write | 140 MB | 2,648 ms
 TBJSON Write | 37 MB | 1,154 ms
 JSON Read | | N/A | 2,073 ms
