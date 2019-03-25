@@ -20,7 +20,7 @@ Each file starts off with ".tbj" to singinify that it is a Typed Binary JSON fil
 
 Offset | Value | Meaning
 -|-|-
-0 | .tbj | States that file type.
+0 | .tbj | States the file type.
 4 | uint32 | Size of the JSON header.
 8 | JSON | A utf-8 serialized JSON map of the binary data to follow.
 x | binary | The binary data.  Always the next byte after the last header byte.
