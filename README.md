@@ -175,7 +175,7 @@ Benchmark | Filesize | Time
 -|-|-
 JSON Write | 140 MB | 2,648 ms
 TBJSON Write | 37 MB | 1,154 ms
-JSON Read | | N/A | 2,073 ms
+JSON Read | N/A | 2,073 ms
 TBJSON Read | N/A | 1,453 ms
 
 
