@@ -4,6 +4,7 @@ import {
 	MAGIC_NUMBER,
 	SIZE_MAGIC_NUMBER,
 	
+	NULL,
 	BYTE,
 	BOOL,
 	INT8,
@@ -18,6 +19,8 @@ import {
 	ARRAY,
 	OBJECT,
 	CUSTOM,
+
+	SIZE_UINT32,
 	
 	TYPE_OFFSET,
 	CLASS_OFFSET,
@@ -28,7 +31,6 @@ import BufferWriter from './BufferWriter';
 import BufferReader from './BufferReader';
 import StreamBufferWriter from './StreamBufferWriter';
 import StreamBufferReader from './StreamBufferReader';
-import { SIZE_UINT32 } from '../lib/constants';
 
 const DEFAULT_STR_ENCODING = 'utf-8';
 const DEFAULT_NUM_ENCODING = FLOAT64;
@@ -267,7 +269,14 @@ export default class Tbjson {
 
 			// primitive
 			if (def < TYPE_OFFSET) {
-				return this.reader.read(def);
+
+				// non-null
+				if (def) {
+					return this.reader.read(def);
+				// null
+				} else {
+					return null;
+				}
 
 			// custom type
 			} else if (def < CLASS_OFFSET) {
@@ -422,7 +431,9 @@ export default class Tbjson {
 				return STRING;
 
 			case 'object':
-				if (Array.isArray(obj)) {
+				if (obj == null) {
+					return NULL;
+				} else if (Array.isArray(obj)) {
 
 					let refs = [];
 

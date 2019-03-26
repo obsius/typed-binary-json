@@ -1,6 +1,6 @@
 {
 	"name": "typed-binary-json",
-	"version": "1.0.4",
+	"version": "1.0.8",
 	"description": "A TBJSON parser and serializer.",
 	"author": "Jeff Seaman",
 	"contributors": [
@@ -9,33 +9,33 @@
 	"license": "MIT",
 	"main": "index.js",
 	"scripts": {
-		"prepare": "babel src -d lib",
+		"prepare": "rollup -c",
 		"start": "nodemon --inspect dev.js --exec babel-node",
 		"benchmarks": "babel-node benchmarks.js"
 	},
 	"babel": {
 		"plugins": [
-			"transform-runtime",
-			[
-				"babel-plugin-root-import",
-				{
-					"rootPathSuffix": "src/",
-					"rootPathPrefix": "~"
-				}
-			]
+			"@babel/plugin-proposal-class-properties"
 		],
 		"presets": [
-			"env",
-			"stage-2"
+			[
+				"@babel/preset-env",
+				{
+					"targets": {
+						"node": "current"
+					}
+				}
+			]
 		]
 	},
 	"devDependencies": {
-		"babel-cli": "^6.26.0",
-		"babel-plugin-root-import": "^6.1.0",
-		"babel-plugin-transform-runtime": "^6.23.0",
-		"babel-preset-env": "^1.7.0",
-		"babel-preset-stage-2": "^6.24.1",
-		"nodemon": "^1.18.10"
+		"@babel/core": "^7.4.0",
+		"@babel/node": "^7.2.2",
+		"@babel/plugin-proposal-class-properties": "^7.4.0",
+		"@babel/preset-env": "^7.4.2",
+		"nodemon": "^1.18.10",
+		"rollup": "^1.7.3",
+		"rollup-plugin-babel": "^4.3.2"
 	},
 	"repository": {
 		"type": "git",

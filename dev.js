@@ -7,6 +7,7 @@ class A {
 	x = 100000.666666666666;
 	y = -999999.999;
 	z = 1234.56789;
+	a = null;
 }
 A.tbjson = {
 	ref: 'A',
@@ -21,7 +22,7 @@ class B {
 	as = [];
 
 	constructor() {
-		for (let i = 0; i < 100; ++i) {
+		for (let i = 0; i < 10; ++i) {
 			this.as.push(new A());
 		}
 	}
@@ -33,7 +34,10 @@ B.tbjson = {
 	}
 }
 
-let root = new B();
+let root = {
+	b: new B(),
+	c: null
+};
 
 (async function() {
 
@@ -46,12 +50,11 @@ let root = new B();
 		//await tbjson.serializeToFile('tbjson.tbj', root);
 
 		buffer = tbjson.serializeToBuffer(root);
-		console.log(buffer.toString());
 		data = tbjson.parseBuffer(buffer);
 
 		//data = tbjson.parseFileAsBuffer('tbjson.tbj');
 
-		//console.log(data);
+		console.log(data);
 		//console.log(JSON.stringify(data));
 
 		console.timeEnd();
