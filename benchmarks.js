@@ -13,6 +13,13 @@ class A {
 		alpha: 'oranges',
 		beta: 10,
 		gamma: [-3.14159, false, true, '!@#$%^&*()']
+	};
+	typedArray = new Float32Array(10);
+
+	constructor() {
+		for (let i = 0; i < this.typedArray.length; ++i) {
+			this.typedArray[i] = i;
+		}
 	}
 }
 
@@ -26,7 +33,8 @@ A.tbjson = {
 			alpha: Tbjson.TYPES.STRING,
 			beta: Tbjson.TYPES.UINT8,
 			gamma: [Tbjson.TYPES.FLOAT32, Tbjson.TYPES.BOOL, Tbjson.TYPES.BOOL, Tbjson.TYPES.STRING]
-		}
+		},
+		typedArray: [Tbjson.TYPES.TYPED_ARRAY, Tbjson.TYPES.FLOAT32]
 	}
 };
 
@@ -36,6 +44,12 @@ class B {
 	number = 86;
 	bool = true;
 	fixedArray = [0, 1, 2, 3, 5, 6, 7, 8, 9];
+
+	constructor() {
+		for (let i = 0; i < 100000; ++i) {
+			this.second.push(new A());
+		}
+	}
 }
 B.tbjson = {
 	ref: 'B',
@@ -61,6 +75,12 @@ B.tbjson = {
 
 class C {
 	first = [];
+
+	constructor() {
+		for (let i = 0; i < 1; ++i) {
+			this.first.push(new B());
+		}
+	}
 }
 C.tbjson = {
 	ref: 'C',
@@ -69,24 +89,21 @@ C.tbjson = {
 	}
 }
 
-let root = new C();
+let root = {
+	c: new C(),
+	typedArray: new Uint32Array(100)
+};
 
-for (let i = 0; i < 100; ++i) {
-
-	let first = new B();
-
-	for (let i = 0; i < 10000; ++i) {
-		first.second.push(new A());
-	}
-
-	root.first.push(first);
+for (let i = 0; i < root.typedArray.length; ++i) {
+	root.typedArray[i] = i;
 }
+
 
 /* benchmarks */
 
 (async function() {
 
-	try {
+//	try {
 		let data;
 
 		console.log('Running benchmarks...');
@@ -111,8 +128,8 @@ for (let i = 0; i < 100; ++i) {
 		//console.log(JSON.stringify(data));
 
 		console.log('Done');
-	} catch(e) {
-		console.error('Error running benchmarks for Tbjson: ' + e);
-	}
+//	} catch(e) {
+//		console.error('Error running benchmarks for Tbjson: ' + e);
+//	}
 
 })();

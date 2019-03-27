@@ -44,7 +44,7 @@ export default class BufferWriter {
 		return this.buffer.slice(0, this.offset);
 	}
 
-	resize() {
+	grow() {
 		this.buffer = Buffer.concat([this.buffer, Buffer.allocUnsafe(this.size * Math.floor(this.xFactor / 2))]);
 	}
 
@@ -117,11 +117,17 @@ export default class BufferWriter {
 		}
 	}
 
+	writeBuffer(buffer) {
+		this.checkSize(buffer.length);
+		buffer.copy(this.buffer, this.offset);
+		this.offset += buffer.length;
+	}
+
 	/* private */
 
 	checkSize(size) {
-		if (this.offset + size > this.size) {
-			this.resize();
+		while (this.offset + size > this.size) {
+			this.grow();
 		}
 	}
 }

@@ -1,4 +1,5 @@
 import fs from 'fs';
+import WrapError from './WrapError';
 
 import {
 	MAGIC_NUMBER,
@@ -17,11 +18,11 @@ import {
 	FLOAT64,
 	STRING,
 	ARRAY,
-	OBJECT,
-	CUSTOM,
+	TYPED_ARRAY,
 
 	SIZE_UINT32,
 	
+	TYPED_ARRAY_OFFSET,
 	TYPE_OFFSET,
 	CLASS_OFFSET,
 	ARRAY_OFFSET
@@ -35,6 +36,8 @@ import StreamBufferReader from './StreamBufferReader';
 const DEFAULT_STR_ENCODING = 'utf-8';
 const DEFAULT_NUM_ENCODING = FLOAT64;
 const DEFAULT_BUFFER_SIZE = 1048576;
+
+let iii = 0;
 
 /**
  * Tbjson
@@ -55,29 +58,59 @@ export default class Tbjson {
 		bufferSize: DEFAULT_BUFFER_SIZE
 	};
 	
-	constructor(types = [], options = {}) {
+	constructor(classes = {}, types = {}, options = {}) {
 		
-		if (types && types.length) {
-			this.registerTypes(types);
-		}
+		this.registerClasses(classes);
+		this.registerTypes(types);
 		
 		this.options = {
 			...this.options,
 			...options
 		};
 	}
+/*
+	getClassRefs(obj, refs = []) {
+		if (obj.constructor) {
+			refs.push(obj.constructor.name);
 
-	registerConstructor(c) {
+		}
+	}
 
+	registerClass2() {
+		let code = w
+	}
+*/
+	registerClass(ref, def) {
+		let code = this.refs[ref];
+
+		// assign a new reference and definition
+		if (!code) {
+			code = this.nextClassCode++;
+			this.refs[ref] = code;
+		}
+
+		// this reference has not been defined, so set the definition
+		if (!this.classes[code]) {
+			this.classes[code] = this.fmtDef(def);
+		}
+
+		return code;
+	}
+
+	registerClasses(classes) {
+		for (let ref in classes) {
+			this.registerClass(ref, classes[ref]);
+		}
 	}
 	
+	// TODO
 	registerType(type) {
 		
 	}
 	
 	registerTypes(types) {
-		for (let obj of types) {
-			this.registerType(obj);
+		for (let ref in types) {
+			this.registerType(ref, types[ref]);
 		}	
 	}
 
@@ -111,7 +144,7 @@ export default class Tbjson {
 			return buffer.buffer;
 
 		} catch (e) {
-			throw new Error('Tbjson failed to create a buffer for the header: ' + e);
+			throw new WrapError(e, 'Tbjson failed to create a buffer for the header');
 		}
 	}
 
@@ -126,7 +159,7 @@ export default class Tbjson {
 			this.root = header.root;
 
 		} catch (e) {
-			throw new Error('Tbjson failed to parse header string: ' + e);
+			throw new WrapError(e, 'Tbjson failed to parse header string');
 		}
 	}
 
@@ -143,7 +176,7 @@ export default class Tbjson {
 			return Buffer.concat([this.getHeaderAsBuffer(), this.writer.getBuffer()]);
 
 		} catch(e) {
-			throw new Error('Tbjson failed to serialize to the buffer: ' + e);
+			throw new WrapError(e, 'Tbjson failed to serialize to the buffer');
 		}
 	}
 	
@@ -160,7 +193,7 @@ export default class Tbjson {
 			this.writer.flush();
 			this.writer = null;
 		} catch (e) {
-			throw new Error('Tbjson failed to serialize to the stream: ' + e);
+			throw new WrapError(e, 'Tbjson failed to serialize to the stream');
 		}
 	}
 
@@ -193,7 +226,7 @@ export default class Tbjson {
 					res();
 				});
 			} catch (e) {
-				rej(new Error(`Tbjson Failed to serialize object to "${filename}": ` + e));
+				rej(new WrapError(e, `Tbjson Failed to serialize object to "${filename}"`));
 			}
 		});
 	}
@@ -221,7 +254,7 @@ export default class Tbjson {
 	}
 
 	parseBuffer(buffer) {
-		try {
+	//	try {
 
 			this.reader = new BufferReader(buffer);
 
@@ -239,16 +272,16 @@ export default class Tbjson {
 			// construct the object
 			return this.parse(this.root);
 
-		} catch(e) {
-			throw new Error('Tbjson failed to parse the buffer: ' + e);
-		}
+		//} catch(e) {
+			throw new WrapError(e, 'Tbjson failed to parse the buffer');
+		//}
 	}
 
 	async parseFileAsStream(filename) {
 		try {
 			return await this.parseStream(fs.createReadStream(filename));
 		} catch (e) {
-			throw new Error(`Tbjson failed to parse "${filename}": ` + e);
+			throw new WrapError(e, `Tbjson failed to parse "${filename}"`);
 		}
 	}
 
@@ -256,21 +289,26 @@ export default class Tbjson {
 		try {
 			return this.parseBuffer(fs.readFileSync(filename));
 		} catch (e) {
-			throw new Error(`Tbjson failed to parse "${filename}": ` + e);
+			throw new WrapError(e, `Tbjson failed to parse "${filename}"`);
 		}
 	}
 
 	/* private */
 
+	/**
+	 * Parse a definition.
+	 * 
+	 * @param { Object | Array | number } def - the definition specifying how to decode the binary data  
+	 */
 	parse(def) {
 
-		// a type
+		// type
 		if (typeof def == 'number') {
 
 			// primitive
-			if (def < TYPE_OFFSET) {
+			if (def < TYPED_ARRAY_OFFSET) {
 
-				// non-null
+				// non null
 				if (def) {
 					return this.reader.read(def);
 				// null
@@ -278,15 +316,19 @@ export default class Tbjson {
 					return null;
 				}
 
+			// primitive typed array
+			} else if (def < TYPE_OFFSET) {
+				return this.reader.readTypedArray(def ^ TYPED_ARRAY_OFFSET, this.reader.read(UINT32));
+
 			// custom type
 			} else if (def < CLASS_OFFSET) {
 				return this.reader.read(def);
 
-			// class
+			// known class
 			} else if (def < ARRAY_OFFSET) {
 				return this.parse(this.classes[def]);
 
-			// typed array
+			// variable-length fixed typed array 
 			} else {
 
 				let length = this.reader.read(UINT32);
@@ -298,7 +340,7 @@ export default class Tbjson {
 				return objs;
 			}
 
-		// a fixed-length array
+		// fixed-length array
 		} else if (Array.isArray(def)) {
 			let objs = [];
 			for (let i = 0; i < def.length; ++i) {
@@ -306,7 +348,7 @@ export default class Tbjson {
 			}
 			return objs;
 
-		// an object
+		// object
 		} else {
 			let obj = {};
 			for (let key in def) {
@@ -316,20 +358,45 @@ export default class Tbjson {
 		}
 	}
 
+	/**
+	 * Format the definition to its number representations.
+	 * 
+	 * Converts the more verbose array definitions to simpler numeric ones:
+	 * 
+	 * [Tbjson.TYPES.ARRAY, Tbjson.TYPES.FLOAT32] -> ARRAY + FLOAT32 = 12 + 9 = 21
+	 * [Tbjson.TYPES.Array, Class] ->                ARRAY + NUM_CLASS = 12 + x
+	 * [Tbjson.TYPES.Array, "class"] ->              ARRAY + NUM_CLASS = 12 + x
+	 * 
+	 * @param { Object | Array | number } def - the definition specifying how to decode the binary data
+	 */
 	fmtDef(def) {
 		switch (typeof def) {
+
+			// already in number form, just return it
 			case 'number':
 				return def;		
 
+			// string referencing a class, add the string to the reference lookup table
 			case 'string':
 				if (this.refs[def]) { return this.refs[def]; }
 				this.refs[def] = this.nextClassCode++;
 				return this.refs[def];
 
+			// object or array
 			case 'object':
+
+				// array
 				if (Array.isArray(def)) {
+
+					// typed array
 					if (def.length == 2 && def[0] == ARRAY) {
 						return ARRAY_OFFSET + this.fmtDef(def[1]);
+
+					// primitive typed array
+					} else if (def.length == 2 && def[0] == TYPED_ARRAY) {
+						return TYPED_ARRAY_OFFSET + this.fmtDef(def[1]);
+
+					// fixed length array
 					} else {
 						let fmtDef = [];
 
@@ -340,6 +407,7 @@ export default class Tbjson {
 						return fmtDef;
 					}
 
+				// simple object
 				} else {
 
 					let fmtDef = {};
@@ -351,63 +419,66 @@ export default class Tbjson {
 					return fmtDef;
 				}
 
-			case 'number':
+			// invalid type
 			case 'boolean':
-				// invalid
 				break;
 		}
 	}
 
-	addClass(obj) {
-		let template = obj.constructor.tbjson;
-		let code = this.refs[template.ref];
-
-		// assign a new reference and definition
-		if (!code) {
-			code = this.nextClassCode++;
-			this.refs[template.ref] = code;
-		}
-
-		// this reference has not been defined, so set the definition
-		if (!this.classes[code]) {
-			this.classes[code] = this.fmtDef(template.def);
-		}
-
-		return code;
-	}
-
+	/**
+	 * Serialize the object based on its definition. Only run for known classes.
+	 * 
+	 * @param { Object } obj - the object to serialize
+	 * @param { Object | Array | number } def - the definition specifying how to decode the binary data
+	 */
 	serializeDef(obj, def) {
 
-		// is typed
+		// typed
 		if (typeof def == 'number') {
 
-			// is variable-length fixed typed array 
-			if (def > ARRAY_OFFSET) {
+			// primitive
+			if (def < TYPED_ARRAY_OFFSET) {
+				this.writer.write(def, obj);
+
+			// primitive typed array
+			} else if (def < TYPE_OFFSET) {
+				this.writer.write(UINT32, obj.buffer.byteLength)
+				this.writer.writeBuffer(Buffer.from(obj.buffer));
+
+			// custom type
+			} else if (def < CLASS_OFFSET) {
+				//TODO
+
+			// known class
+			} else if (def < ARRAY_OFFSET) {
+
+				// register the class if needed
+				if (obj.constructor.tbjson) {
+					this.registerClass(obj.constructor.tbjson.ref, obj.constructor.tbjson.def);
+				}
+
+				this.serializeDef(obj, this.classes[def]);
+
+			//variable-length fixed typed array 
+			} else {
+				// write out the length
 				this.writer.write(UINT32, obj.length);
+
 				for (let i = 0; i < obj.length; ++i) {
 					this.serializeDef(obj[i], def ^ ARRAY_OFFSET);
 				}
-
-			// class object
-			} else if (def > CLASS_OFFSET) {
-				this.addClass(obj);
-				this.serializeDef(obj, this.classes[def]);
-
-			// is primitive
-			} else {
-				this.writer.write(def, obj);
 			}
-
-		// is a sub object or array
+			
+		// oject or array
 		} else {
 
-			// is fixed-length variable type array
+			// fixed-length variable type array
 			if (Array.isArray(def)) {
 				for (let i = 0; i < def.length; ++i) {
 					this.serializeDef(obj[i], def[i]);
 				}
 
-			// is a sub object
+			// object
 			} else {
 				for (let key in def) {
 					this.serializeDef(obj[key], def[key]);
@@ -416,57 +487,133 @@ export default class Tbjson {
 		}
 	}
 
+	/**
+	 * Serialize an object. Can be known (TBJSON has a definition for it) or plain (Class or object that TBJSON doesn't have a definition for).
+	 * Calls serializeDef() if a known type is found.
+	 * 
+	 * @param {obj} obj - the object to serialize
+	 */
 	serialize(obj) {
 		switch (typeof obj) {
+
+			// bool
 			case 'boolean':
 				this.writer.write(BOOL, obj);
 				return BOOL;
 
+			// number, use the default number type
 			case 'number':
 				this.writer.write(FLOAT32, obj);
 				return FLOAT32;
 
+			// string
 			case 'string':
 				this.writer.write(STRING, obj);
 				return STRING;
 
+			// null, object, or array
 			case 'object':
+
+				// null
 				if (obj == null) {
 					return NULL;
+
+				// array
 				} else if (Array.isArray(obj)) {
-
 					let refs = [];
-
 					for (let i = 0; i < obj.length; ++i) {
 						refs.push(this.serialize(obj[i]));
 					}
-
 					return refs;
 
-				} else {
+				// primitive typed array
+				} else if (ArrayBuffer.isView(obj)) {
 
-					// the object is a known tbjson class
-					if (obj.constructor && obj.constructor.tbjson) {
+					let ref = NULL;
 
-						// add this object type to the known classes
-						let code = this.addClass(obj);
-
-						// process the class
-						this.serializeDef(obj, this.classes[code]);
-
-						return code;
+					if (obj instanceof Uint8Array) {
+						ref = TYPED_ARRAY_OFFSET + UINT8;
+					} else if (obj instanceof Uint8Array) {
+						ref = TYPED_ARRAY_OFFSET + INT8;
+					} else if (obj instanceof Uint16Array) {
+						ref = TYPED_ARRAY_OFFSET + UINT16;
+					} else if (obj instanceof Int16Array) {
+						ref = TYPED_ARRAY_OFFSET + INT16;
+					} else if (obj instanceof Uint32Array) {
+						ref = TYPED_ARRAY_OFFSET + UINT32;
+					} else if (obj instanceof Int32Array) {
+						ref = TYPED_ARRAY_OFFSET + INT32;
+					} else if (obj instanceof Float32Array) {
+						ref = TYPED_ARRAY_OFFSET + FLOAT32;
+					} else if (obj instanceof Float64Array) {
+						ref = TYPED_ARRAY_OFFSET + FLOAT64;
 					}
 
-					let ref = {};
+					if (ref) {
+						this.writer.write(UINT32, obj.buffer.byteLength);
+						this.writer.writeBuffer(Buffer.from(obj.buffer));
+					}
 
+					return ref;
+
+				// object or known class
+				} else {
+
+					// the object is class
+					if (obj.constructor) {
+
+						// a known tbjson class
+						if (obj.constructor.tbjson) {
+
+							// add this object type to the known classes
+							let code = this.registerClass(obj.constructor.tbjson.ref, obj.constructor.tbjson.def);
+
+							// process the class
+							this.serializeDef(obj, this.classes[code]);
+
+							return code;
+
+						// might be a known tbjson class
+						} else {
+
+							let code = this.refs[obj.constructor.name];
+							if (code) {
+
+								// process the class
+								this.serializeDef(obj, this.classes[code]);
+
+								return code;
+							}
+						}
+					}
+
+					// simple object, traverse accordingly
+					let ref = {};
 					for (let key in obj) {
 						ref[key] = this.serialize(obj[key]);
 					}
-
 					return ref;
 				}
 		}
 	}
 }
 
-Tbjson.TYPES = { BYTE, BOOL, INT8, UINT8, INT16, UINT16, INT32, UINT32, FLOAT32, FLOAT64, STRING, ARRAY, OBJECT, CUSTOM };
+Tbjson.TYPES = { NULL, BYTE, BOOL, INT8, UINT8, INT16, UINT16, INT32, UINT32, FLOAT32, FLOAT64, STRING, ARRAY, TYPED_ARRAY };
+
+/* internal */
+
+/**
+ * Get the name and names of a classes parents.
+ * 
+ * @param {Class} proto - the class to check the hierarchical names of 
+ */
+function getClassRefs(proto) {
+
+	let refs = [];
+
+	if (proto.name) {
+		refs = [proto.name].concat(getClassRefs(Object.getPrototypeOf(proto)));
+	}
+
+	return refs;
+}
