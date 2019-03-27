@@ -1,5 +1,4 @@
 import fs from 'fs';
-import WrapError from './WrapError';
 
 import {
 	MAGIC_NUMBER,
@@ -144,7 +143,8 @@ export default class Tbjson {
 			return buffer.buffer;
 
 		} catch (e) {
-			throw new WrapError(e, 'Tbjson failed to create a buffer for the header');
+			e.message = 'Tbjson failed to create a buffer for the header: ' + e.message;
+			throw e;
 		}
 	}
 
@@ -159,7 +159,8 @@ export default class Tbjson {
 			this.root = header.root;
 
 		} catch (e) {
-			throw new WrapError(e, 'Tbjson failed to parse header string');
+			e.message = 'Tbjson failed to parse header string: ' + e.message;
+			throw e;
 		}
 	}
 
@@ -176,7 +177,8 @@ export default class Tbjson {
 			return Buffer.concat([this.getHeaderAsBuffer(), this.writer.getBuffer()]);
 
 		} catch(e) {
-			throw new WrapError(e, 'Tbjson failed to serialize to the buffer');
+			e.message = 'Tbjson failed to serialize to the buffer: ' + e.message;
+			throw e;
 		}
 	}
 	
@@ -193,7 +195,8 @@ export default class Tbjson {
 			this.writer.flush();
 			this.writer = null;
 		} catch (e) {
-			throw new WrapError(e, 'Tbjson failed to serialize to the stream');
+			e.message = 'Tbjson failed to serialize to the stream: ' + e.message;
+			throw e;
 		}
 	}
 
@@ -226,7 +229,8 @@ export default class Tbjson {
 					res();
 				});
 			} catch (e) {
-				rej(new WrapError(e, `Tbjson Failed to serialize object to "${filename}"`));
+				e.message = `Tbjson Failed to serialize object to "${filename}": ` + e.message;
+				rej(e);
 			}
 		});
 	}
@@ -254,7 +258,7 @@ export default class Tbjson {
 	}
 
 	parseBuffer(buffer) {
-	//	try {
+		try {
 
 			this.reader = new BufferReader(buffer);
 
@@ -272,16 +276,18 @@ export default class Tbjson {
 			// construct the object
 			return this.parse(this.root);
 
-		//} catch(e) {
-			throw new WrapError(e, 'Tbjson failed to parse the buffer');
-		//}
+		} catch(e) {
+			e.message = 'Tbjson failed to parse the buffer: ' + e.message;
+			throw e;
+		}
 	}
 
 	async parseFileAsStream(filename) {
 		try {
 			return await this.parseStream(fs.createReadStream(filename));
 		} catch (e) {
-			throw new WrapError(e, `Tbjson failed to parse "${filename}"`);
+			e.message = `Tbjson failed to parse "${filename}": ` + e.message;
+			throw e;
 		}
 	}
 
@@ -289,7 +295,8 @@ export default class Tbjson {
 		try {
 			return this.parseBuffer(fs.readFileSync(filename));
 		} catch (e) {
-			throw new WrapError(e, `Tbjson failed to parse "${filename}"`);
+			e.message = `Tbjson failed to parse "${filename}": ` + e.message;
+			throw e;
 		}
 	}
 

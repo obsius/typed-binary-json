@@ -14,8 +14,8 @@ class A {
 		beta: 10,
 		gamma: [-3.14159, false, true, '!@#$%^&*()']
 	};
-	float32Array = new Float32Array(100);
-	int16Array = new Int16Array(100);
+	float32Array = new Float32Array(10);
+	int16Array = new Int16Array(10);
 
 	constructor() {
 		for (let i = 0; i < this.float32Array.length; ++i) {
@@ -106,7 +106,7 @@ for (let i = 0; i < root.typedArray.length; ++i) {
 
 (async function() {
 
-//	try {
+	try {
 
 		console.log('Running benchmarks...');
 
@@ -135,8 +135,8 @@ for (let i = 0; i < root.typedArray.length; ++i) {
 		//console.log(JSON.stringify(data));
 
 		console.log('Done');
-//	} catch(e) {
-//		console.error('Error running benchmarks for Tbjson: ' + e);
-//	}
+	} catch(e) {
+		console.error('Error running benchmarks for Tbjson: ' + e);
+	}
 
 })();
