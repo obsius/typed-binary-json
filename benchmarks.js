@@ -14,11 +14,13 @@ class A {
 		beta: 10,
 		gamma: [-3.14159, false, true, '!@#$%^&*()']
 	};
-	typedArray = new Float32Array(10);
+	float32Array = new Float32Array(100);
+	int16Array = new Int16Array(100);
 
 	constructor() {
-		for (let i = 0; i < this.typedArray.length; ++i) {
-			this.typedArray[i] = i;
+		for (let i = 0; i < this.float32Array.length; ++i) {
+			this.float32Array[i] = i;
+			this.int16Array[i] = i;
 		}
 	}
 }
@@ -34,7 +36,8 @@ A.tbjson = {
 			beta: Tbjson.TYPES.UINT8,
 			gamma: [Tbjson.TYPES.FLOAT32, Tbjson.TYPES.BOOL, Tbjson.TYPES.BOOL, Tbjson.TYPES.STRING]
 		},
-		typedArray: [Tbjson.TYPES.TYPED_ARRAY, Tbjson.TYPES.FLOAT32]
+		float32Array: [Tbjson.TYPES.TYPED_ARRAY, Tbjson.TYPES.FLOAT32],
+		int16Array:[Tbjson.TYPES.TYPED_ARRAY, Tbjson.TYPES.INT16]
 	}
 };
 
@@ -46,7 +49,7 @@ class B {
 	fixedArray = [0, 1, 2, 3, 5, 6, 7, 8, 9];
 
 	constructor() {
-		for (let i = 0; i < 100000; ++i) {
+		for (let i = 0; i < 1000; ++i) {
 			this.second.push(new A());
 		}
 	}
@@ -77,7 +80,7 @@ class C {
 	first = [];
 
 	constructor() {
-		for (let i = 0; i < 1; ++i) {
+		for (let i = 0; i < 100; ++i) {
 			this.first.push(new B());
 		}
 	}
@@ -104,27 +107,31 @@ for (let i = 0; i < root.typedArray.length; ++i) {
 (async function() {
 
 //	try {
-		let data;
 
 		console.log('Running benchmarks...');
 
 		console.time('JSON Write');
-		fs.writeFileSync('json._json', JSON.stringify(root));
+		//fs.writeFileSync('json._json', JSON.stringify(root));
+		let json = JSON.stringify(root)
 		console.timeEnd('JSON Write');
 
 		console.time('Tbjson Write');
-		await tbjson.serializeToFile('tbjson.tbj', root);
+		//await tbjson.serializeToFile('tbjson.tbj', root);
+		let data = tbjson.serializeToBuffer(root);
 		console.timeEnd('Tbjson Write');
 
 		console.time('JSON Read');
-		data = JSON.parse(fs.readFileSync('json._json'));
+		//data = JSON.parse(fs.readFileSync('json._json'));
+		JSON.parse(json);
 		console.timeEnd('JSON Read');
 
 		console.time('Tbjson Read');
-		data = tbjson.parseFileAsBuffer('tbjson.tbj');
+		//data = tbjson.parseFileAsBuffer('tbjson.tbj');
+		tbjson.parseBuffer(data);
 		console.timeEnd('Tbjson Read');
 
 		//console.log(data);
+		//console.log(data.c.first[0].second);
 		//console.log(JSON.stringify(data));
 
 		console.log('Done');
