@@ -5,7 +5,6 @@ import {
 	SIZE_MAGIC_NUMBER,
 	
 	NULL,
-	BYTE,
 	BOOL,
 	INT8,
 	UINT8,
@@ -17,10 +16,13 @@ import {
 	FLOAT64,
 	STRING,
 	ARRAY,
+	OBJECT,
+	NULLABLE,
 	TYPED_ARRAY,
 
 	SIZE_UINT32,
 	
+	NULLABLE_OFFSET,
 	TYPED_ARRAY_OFFSET,
 	TYPE_OFFSET,
 	PROTOTYPE_OFFSET,
@@ -53,12 +55,17 @@ export default class Tbjson {
 	protoRefs = {};
 	protos = {};
 
+	// for plain objects that are inside of known prototypers
+	// maybe TODO: objRefs = {};
+	objs = {};
+
 	// binary definition tree
 	root = null;
 
 	// counters for converting types and prototypes to an incrementing numeric value
 	nextTypeCode = TYPE_OFFSET;
 	nextProtoCode = PROTOTYPE_OFFSET;
+	nextObjCode = 0;
 
 	// defaults
 	options = {
@@ -179,17 +186,11 @@ export default class Tbjson {
 	 *     }
 	 * }]
 	 * 
-	 * @param {[]Object} prototypes - array of prototypes 
+	 * @param {[]object} prototypes - array of prototypes 
 	 */
-	registerPrototypes(prototypes) {
+	registerPrototypes(prototypes = []) {
 		for (let prototype of prototypes) {
-			this.registerPrototype(
-				prototype.constructor,
-				prototype.definition,
-				prototype.reference,
-				prototype.parentReference,
-				prototype.noInherit
-			);
+			this.registerPrototype(prototype);
 		}
 	}
 	
@@ -201,11 +202,9 @@ export default class Tbjson {
 	 * 
 	 * tbjson.registerType('Float48', (data, buffer) => {}, (buffer) => obj);
 	 * 
-	 * @param {ref} ref - name for this type 
-	 * @param {Function} serializer - the function that serializes to a buffer
-	 * @param {Function} deserializer - the function to deserialize from a buffer
+	 * @param {object} type - type to add
 	 */
-	registerType(ref, serializer, deserializer) {
+	registerType(type) {
 		
 	}
 	
@@ -226,12 +225,12 @@ export default class Tbjson {
 	 *     }
 	 * }]
 	 * 
-	 * @param {[]Object} types - array of types to register 
+	 * @param {[]object} types - array of types to register 
 	 */
-	registerTypes(types) {
+	registerTypes(types = []) {
 		for (let type of types) {
 			this.registerType(ref, type.serializer, type.deserializer);
-		}	
+		}
 	}
 
 	/**
@@ -275,7 +274,7 @@ export default class Tbjson {
 	/**
 	 * Serialize the obj to a buffer.  Fastest, but uses the most memory.
 	 * 
-	 * @param {Object} obj - object to serialize 
+	 * @param {object} obj - object to serialize 
 	 */
 	serializeToBuffer(obj) {
 		try {
@@ -298,8 +297,8 @@ export default class Tbjson {
 	/**
 	 * Serialize the object to the stream.  Slower, but uses the least memory.
 	 * 
-	 * @param {Stream} stream - stream to serialize to
-	 * @param {Object} obj - object to serialize 
+	 * @param {stream} stream - stream to serialize to
+	 * @param {object} obj - object to serialize 
 	 */
 	serializeToStream(stream, obj) {
 		try {
@@ -323,7 +322,7 @@ export default class Tbjson {
 	 * Serialize the object to a file. Opens as a write stream, so it's slower and uses less memory.
 	 * 
 	 * @param {string} filename - filename / path to write to
-	 * @param {Object} obj - object to serialize
+	 * @param {object} obj - object to serialize
 	 */
 	serializeToFile(filename, obj) {
 		return new Promise((res, rej) => {
@@ -366,7 +365,7 @@ export default class Tbjson {
 	/**
 	 * Parse a TBJSON containing buffer into ab object. Fastest, but uses the most memory.
 	 * 
-	 * @param {Buffer} buffer - buffer to read from
+	 * @param {buffer} buffer - buffer to read from
 	 */
 	parseBuffer(buffer) {
 		try {
@@ -397,7 +396,7 @@ export default class Tbjson {
 	 * TODO:
 	 * Parse a TBJSON containing stream into an object. Slower, but uses the least memory.
 	 * 
-	 * @param {Stream} stream - stream to read from
+	 * @param {stream} stream - stream to read from
 	 */
 	parseStream(stream) {
 		return new Promise(async (res, rej) => {
@@ -477,6 +476,7 @@ export default class Tbjson {
 			typeDefs: typeDefs,
 			protoRefs: this.protoRefs,
 			protoDefs: protoDefs,
+			objs: this.objs,
 			root: this.root
 		};
 	}
@@ -534,6 +534,9 @@ export default class Tbjson {
 		//		this.protos[code] = new Prototype(header.protoDefs[code]);
 		//	}
 
+			// unknown objects
+			this.objs = header.objs;
+
 			this.root = header.root;
 
 		} catch (e) {
@@ -546,80 +549,6 @@ export default class Tbjson {
 	/* private */
 
 	/**
-	 * Parse a definition.
-	 * 
-	 * @param { Object | Array | number } def - the definition specifying how to decode the binary data  
-	 */
-	parse(def) {
-
-		// type
-		if (typeof def == 'number') {
-
-			// primitive
-			if (def < TYPED_ARRAY_OFFSET) {
-
-				// non null
-				if (def) {
-					return this.reader.read(def);
-				// null
-				} else {
-					return null;
-				}
-
-			// primitive typed array
-			} else if (def < TYPE_OFFSET) {
-				return this.reader.readTypedArray(def ^ TYPED_ARRAY_OFFSET, this.reader.read(UINT32));
-
-			// custom type
-			} else if (def < PROTOTYPE_OFFSET) {
-				return this.reader.read(def);
-
-			// known prototype
-			} else if (def < ARRAY_OFFSET) {
-				let proto = this.protos[def];
-				let x = new proto.prototype();
-				let y = this.parse(proto.definition);
-				x.x = y.x;
-				x.y = y.y;
-				x.z = y.z;
-				return ;
-			//	if (proto.prototype) {
-			//		return Object.assign(new proto.prototype(), this.parse(proto.definition));
-			//	} else {
-			//		return this.parse(proto.definition);
-			//	}
-
-			// variable-length fixed typed array 
-			} else {
-
-				let length = this.reader.read(UINT32);
-				let objs = [];
-
-				for (let i = 0; i < length; ++i) {
-					objs.push(this.parse(def ^ ARRAY_OFFSET));
-				}
-				return objs;
-			}
-
-		// fixed-length array
-		} else if (Array.isArray(def)) {
-			let objs = [];
-			for (let i = 0; i < def.length; ++i) {
-				objs.push(this.parse(def[i]));
-			}
-			return objs;
-
-		// object
-		} else {
-			let obj = {};
-			for (let key in def) {
-				obj[key] = this.parse(def[key]);
-			}
-			return obj;
-		}
-	}
-
-	/**
 	 * Format the definition to its number representations.
 	 * 
 	 * Converts the more verbose array definitions to simpler numeric ones:
@@ -628,7 +557,7 @@ export default class Tbjson {
 	 * [Tbjson.TYPES.Array, Class] ->                ARRAY + NUM_CLASS = 12 + x
 	 * [Tbjson.TYPES.Array, "class"] ->              ARRAY + NUM_CLASS = 12 + x
 	 * 
-	 * @param { Object | Array | number } def - the definition specifying how to decode the binary data
+	 * @param { object | array | number } def - the definition specifying how to decode the binary data
 	 */
 	fmtDef(def) {
 		switch (typeof def) {
@@ -656,6 +585,10 @@ export default class Tbjson {
 					// typed array
 					if (def.length == 2 && def[0] == ARRAY) {
 						return ARRAY_OFFSET + this.fmtDef(def[1]);
+
+					// nullable primitive
+					} else if (def.length == 2 && def[0] == NULLABLE) {
+						return NULLABLE_OFFSET + this.fmtDef(def[1]);
 
 					// primitive typed array
 					} else if (def.length == 2 && def[0] == TYPED_ARRAY) {
@@ -693,8 +626,8 @@ export default class Tbjson {
 	/**
 	 * Serialize the object based on its definition. Only run for known prototypes.
 	 * 
-	 * @param { Object } obj - the object to serialize
-	 * @param { Object | Array | number } def - the definition specifying how to decode the binary data
+	 * @param { object } obj - the object to serialize
+	 * @param { object | array | number } def - the definition specifying how to decode the binary data
 	 */
 	serializeDef(obj, def) {
 
@@ -702,8 +635,27 @@ export default class Tbjson {
 		if (typeof def == 'number') {
 
 			// primitive
-			if (def < TYPED_ARRAY_OFFSET) {
-				this.writer.write(def, obj);
+			if (def < NULLABLE_OFFSET) {
+
+				// an unknown object, kick back to the serializer
+				if (def == OBJECT) {
+					let code = this.nextObjCode++;
+					this.writer.write(UINT32, code);
+					this.objs[code] = this.serialize(obj);
+
+				// primitive
+				} else {
+					this.writer.write(def, obj);
+				}
+
+			// nullable primitive
+			} else if (def < TYPED_ARRAY_OFFSET) {
+				if (obj == null) {
+					this.writer.write(UINT8, 0);
+				} else {
+					this.writer.write(UINT8, 1);
+					this.writer.write(def - NULLABLE_OFFSET, obj);
+				}
 
 			// primitive typed array
 			} else if (def < TYPE_OFFSET) {
@@ -730,7 +682,7 @@ export default class Tbjson {
 				this.writer.write(UINT32, obj.length);
 
 				for (let i = 0; i < obj.length; ++i) {
-					this.serializeDef(obj[i], def ^ ARRAY_OFFSET);
+					this.serializeDef(obj[i], def - ARRAY_OFFSET);
 				}
 			}
 			
@@ -756,7 +708,7 @@ export default class Tbjson {
 	 * Serialize an object. Can be known (TBJSON has a definition for it) or plain (Class or object that TBJSON doesn't have a definition for).
 	 * Calls serializeDef() if a known type is found.
 	 * 
-	 * @param {obj} obj - the object to serialize
+	 * @param {object} obj - the object to serialize
 	 */
 	serialize(obj) {
 		switch (typeof obj) {
@@ -798,7 +750,7 @@ export default class Tbjson {
 
 					if (obj instanceof Uint8Array) {
 						ref = TYPED_ARRAY_OFFSET + UINT8;
-					} else if (obj instanceof Uint8Array) {
+					} else if (obj instanceof Int8Array) {
 						ref = TYPED_ARRAY_OFFSET + INT8;
 					} else if (obj instanceof Uint16Array) {
 						ref = TYPED_ARRAY_OFFSET + UINT16;
@@ -861,9 +813,93 @@ export default class Tbjson {
 				}
 		}
 	}
+
+	/**
+	 * Parse a definition.
+	 * 
+	 * @param { object | array | number } def - the definition specifying how to decode the binary data  
+	 */
+	parse(def) {
+
+		// type
+		if (typeof def == 'number') {
+
+			// primitive
+			if (def < NULLABLE_OFFSET) {
+
+				// null
+				if (def == NULL) {
+					return null;
+
+				// unknown object
+				} else if (def == OBJECT) {
+					return this.parse(this.objs[this.reader.read(UINT32)]);
+
+				// primitive
+				} else {
+					return this.reader.read(def);
+				}
+
+			// nullable primitive
+			} else if (def < TYPED_ARRAY_OFFSET) {
+
+				// non null
+				if (this.reader.read(UINT8)) {
+					return this.reader.read(def - NULLABLE_OFFSET);
+				// null
+				} else {
+					return null;
+				}
+
+			// primitive typed array
+			} else if (def < TYPE_OFFSET) {
+				return this.reader.readTypedArray(def - TYPED_ARRAY_OFFSET, this.reader.read(UINT32));
+
+			// custom type
+			} else if (def < PROTOTYPE_OFFSET) {
+				return this.reader.read(def);
+
+			// known prototype
+			} else if (def < ARRAY_OFFSET) {
+				let proto = this.protos[def];
+				if (proto.prototype) {
+					return Object.assign(new proto.prototype(), this.parse(proto.definition));
+				} else {
+					return this.parse(proto.definition);
+				}
+
+			// variable-length fixed typed array 
+			} else {
+
+				let length = this.reader.read(UINT32);
+				let objs = [];
+
+				for (let i = 0; i < length; ++i) {
+					objs.push(this.parse(def - ARRAY_OFFSET));
+				}
+				return objs;
+			}
+
+		// fixed-length array
+		} else if (Array.isArray(def)) {
+			let objs = [];
+			for (let i = 0; i < def.length; ++i) {
+				objs.push(this.parse(def[i]));
+			}
+			return objs;
+
+		// object
+		} else {
+			let obj = {};
+			for (let key in def) {
+				obj[key] = this.parse(def[key]);
+			}
+			return obj;
+		}
+	}
 }
 
-Tbjson.TYPES = { NULL, BYTE, BOOL, INT8, UINT8, INT16, UINT16, INT32, UINT32, FLOAT32, FLOAT64, STRING, ARRAY, TYPED_ARRAY };
+Tbjson.TYPES = { NULL, BOOL, INT8, UINT8, INT16, UINT16, INT32, UINT32, FLOAT32, FLOAT64, STRING, ARRAY, OBJECT, NULLABLE, TYPED_ARRAY };
 
 /* internal */
 
@@ -873,13 +909,6 @@ Tbjson.TYPES = { NULL, BYTE, BOOL, INT8, UINT8, INT16, UINT16, INT32, UINT32, FL
  * @param {function} prototype - prototype to check for parent of 
  */
 function getParent(prototype) {
-	let parent = Object.getPrototypeOf(prototype);
-	return parent.name ? parent : null;
-}
-
-function assign(obj1, obj2) {
-	for (let k in obj2) {
-		obj1[k] = obj2[k];
-	}
-	return obj1;
+	let parent = prototype ? Object.getPrototypeOf(prototype) : null;
+	return (parent && parent.name) ? parent : null;
 }

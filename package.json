@@ -11,7 +11,8 @@
 	"scripts": {
 		"prepare": "rollup -c",
 		"start": "nodemon --inspect dev.js --exec babel-node",
-		"benchmarks": "babel-node benchmarks.js"
+		"benchmarks": "babel-node benchmarks.js",
+		"test": "babel-node test"
 	},
 	"babel": {
 		"plugins": [
