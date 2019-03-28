@@ -261,7 +261,7 @@ export default class Tbjson {
 
 				// parent is finalized, so this can be to
 				if (finalizedProtos[prototype.parentCode]) {
-					prototype.definition = Object.assign({}, prototype.definition, this.protos[prototype.parentCode].definition);
+					prototype.definition = Object.assign({}, this.protos[prototype.parentCode].definition, prototype.definition);
 					finalizedProtos[code] = true;
 				}
 			}
@@ -524,14 +524,25 @@ export default class Tbjson {
 
 			// types
 			this.typeRefs = header.typeRefs;
+			this.types = {};
 			for (let code in header.typeDefs) {
 				this.types[code] = new Type(Function(header.typeDefs[code].serializer), Function(header.typeDefs[code].deserializer));
 			}
 
-			// prototypes
+			/* prototypes */
+
+		//	let oldProtos = this.protos;
+
 		//	this.protoRefs = header.protoRefs;
+		//	this.protos = {};
+
 		//	for (let code in header.protoDefs) {
 		//		this.protos[code] = new Prototype(header.protoDefs[code]);
+		//	}
+
+			// reassign old protos
+		//	for (let oldProto of oldProto) {
+
 		//	}
 
 			// unknown objects
@@ -631,17 +642,23 @@ export default class Tbjson {
 	 */
 	serializeDef(obj, def) {
 
+		// no def, could be a known but undefined prototype, or a plain object, kick back to the serializer
+		if (!def) {
+			let code = this.nextObjCode++;
+			this.writer.write(UINT32, code);
+			this.objs[code] = this.serialize(obj);
+			return;
+		}
+
 		// typed
 		if (typeof def == 'number') {
 
 			// primitive
 			if (def < NULLABLE_OFFSET) {
 
-				// an unknown object, kick back to the serializer
+				// an unknown object
 				if (def == OBJECT) {
-					let code = this.nextObjCode++;
-					this.writer.write(UINT32, code);
-					this.objs[code] = this.serialize(obj);
+					this.serializeDef(obj);
 
 				// primitive
 				} else {
@@ -785,7 +802,7 @@ export default class Tbjson {
 							// add this object type to the known prototypes
 							let code = this.registerPrototype(obj.constructor);
 
-							// process the prototype
+							// process the prototype definition
 							this.serializeDef(obj, this.protos[code].definition);
 
 							return code;
@@ -817,9 +834,10 @@ export default class Tbjson {
 	/**
 	 * Parse a definition.
 	 * 
-	 * @param { object | array | number } def - the definition specifying how to decode the binary data  
+	 * @param { object | array | number } def - the definition specifying how to decode the binary data
+	 * @param {function} prototype - [optional] create this type during object instantiation
 	 */
-	parse(def) {
+	parse(def, prototype) {
 
 		// type
 		if (typeof def == 'number') {
@@ -861,11 +879,16 @@ export default class Tbjson {
 
 			// known prototype
 			} else if (def < ARRAY_OFFSET) {
+				
 				let proto = this.protos[def];
-				if (proto.prototype) {
-					return Object.assign(new proto.prototype(), this.parse(proto.definition));
+
+				// defined
+				if (proto.definition) {
+					return this.parse(proto.definition, proto.protoype);
+
+				// undefined
 				} else {
-					return this.parse(proto.definition);
+					return this.parse(this.objs[this.reader.read(UINT32)], proto.prototype);
 				}
 
 			// variable-length fixed typed array 
@@ -890,7 +913,7 @@ export default class Tbjson {
 
 		// object
 		} else {
-			let obj = {};
+			let obj = prototype ? new prototype() : {};
 			for (let key in def) {
 				obj[key] = this.parse(def[key]);
 			}

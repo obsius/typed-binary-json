@@ -3,9 +3,9 @@ export default function(Tbjson, stringify) {
 	let tbjson = new Tbjson();
 
 	class A {
-		float32 = 100000.666;
-		float32 = -999999.999;
-		float32 = 1234.56789;
+		x = 10000.666;
+		y = -9999.999;
+		z = 1234.5678;
 	}
 	
 	class B extends A {
@@ -21,8 +21,8 @@ export default function(Tbjson, stringify) {
 		prototype: A,
 		definition: {
 			x: Tbjson.TYPES.FLOAT32,
-			z: Tbjson.TYPES.FLOAT32,
-			y: Tbjson.TYPES.FLOAT32
+			y: Tbjson.TYPES.FLOAT32,
+			z: Tbjson.TYPES.FLOAT32
 		}
 	});
 
@@ -33,6 +33,8 @@ export default function(Tbjson, stringify) {
 			string: Tbjson.TYPES.STRING
 		}
 	});
+
+	tbjson.finalizePrototypes();
 
 	return [
 		stringify(x),
