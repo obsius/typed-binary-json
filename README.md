@@ -31,9 +31,11 @@ The header contains information necessary to parse the binary data. It is raw JS
 
 Entry | Meaning
 -|-
-refs | A simple map that translates known class and object names (either passed in or the object's constructor name).
-classes | Definitions for known classes or objects that are referenced in the root definition.
+typeRefs | A map that translates known type names to their codes.
 types | Custom primitive types that have been defined for this serialization.
+protoRefs | A map that translates known class and object names (either passed in or the object's constructor name) to their codes.
+protos | Definitions for known prototypes or classes that are referenced in the root definition.
+objs | Definitions for unknown objects that are referenced in known prototypes.
 root | The object that was serialized. Contains the definition needed to decode the binary format.
 
 
@@ -48,7 +50,7 @@ let serializedToBuffer = tbjson.serializeToBuffer({ a: "a", b: 1, c: true }); //
 tbjson.parseBuffer(serializedToBuffer); // parse the buffer
 
 // use these to register classes and types
-tbjson.registerClass();
+tbjson.registerPrototype();
 tbjson.registerType();
 ```
 
@@ -64,8 +66,8 @@ class A {
 
 // make "A" a known class type
 A.tbjson = {
-	ref: 'A', // refer to this class type as "A", defaults to the contructor name if not given (which could have namespace issues)
-	def: {
+	reference: 'A', // refer to this class type as "A", defaults to the contructor name if not given (which could have namespace issues)
+	definition: {
 		x: Tbjson.TYPES.FLOAT32,
 		y: Tbjson.TYPES.FLOAT32,
 		z: Tbjson.TYPES.FLOAT32,
@@ -81,8 +83,7 @@ class B {
 
 // make "B" a known class type
 B.tbjson = {
-	ref: 'B',
-	def: {
+	definition: {
 		as: [Tbjson.TYPES.ARRAY, 'A'], // use the [ array, type ] notation to say that "B.as" is an array of "A"
 		string: Tbjson.TYPES.STRING,
 		bool: Tbjson.TYPES.BOOL,
@@ -136,10 +137,15 @@ Read the whole file `filename` into memory and parse its conents. Preferred for 
 ##### parseFileAsStream(filename)
 Create a read stream for `filename` and parse its contents. Useful for very large files, but slower. Returns the parsed object.
 
-### Classes
+### Prototypes
+
+#### registerPrototype(obj)
+Register a prototype. `obj` is the definition for the prototype.
 
 ### Types
 
+#### registerType(obj)
+Register a custom type (a primitive, like int48, etc...). `obj` is the definition for the custom type.
 
 ## Performance
 Performance varies on the data type, but you'll get best performance if your types have lots of numeric values, and even better performance if you can take advantage of `float32`, `int32`, `int16`, and `int8` to save space.  
@@ -181,6 +187,7 @@ TBJSON Read | N/A | 1,453 ms
 
 ## TODO
 - Better stream handling
+- Finish implementing custom types
 
 ## Contributing
 Feel free to make changes and submit pull requests whenever.

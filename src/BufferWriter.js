@@ -1,6 +1,5 @@
 import {
 	NULL,
-	BYTE,
 	BOOL,
 	UINT8,
 	INT8,
@@ -58,7 +57,6 @@ export default class BufferWriter {
 
 			case NULL:
 				val = 0;
-			case BYTE:
 			case BOOL:
 			case UINT8:
 				this.checkSize(SIZE_UINT8);
