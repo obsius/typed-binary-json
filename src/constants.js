@@ -36,5 +36,5 @@ export const SIZE_FLOAT64 = 8;
 // offsets
 export const TYPED_ARRAY_OFFSET = 16;
 export const TYPE_OFFSET =        32;
-export const CLASS_OFFSET =       64;
+export const PROTOTYPE_OFFSET =   64;
 export const ARRAY_OFFSET =       512;

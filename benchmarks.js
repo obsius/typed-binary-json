@@ -14,8 +14,8 @@ class A {
 		beta: 10,
 		gamma: [-3.14159, false, true, '!@#$%^&*()']
 	};
-	float32Array = new Float32Array(10);
-	int16Array = new Int16Array(10);
+	float32Array = new Float32Array(100);
+	int16Array = new Int16Array(100);
 
 	constructor() {
 		for (let i = 0; i < this.float32Array.length; ++i) {
@@ -26,8 +26,7 @@ class A {
 }
 
 A.tbjson = {
-	ref: 'A',
-	def: {
+	definition: {
 		x: Tbjson.TYPES.FLOAT32,
 		z: Tbjson.TYPES.FLOAT32,
 		y: Tbjson.TYPES.FLOAT32,
@@ -55,8 +54,7 @@ class B {
 	}
 }
 B.tbjson = {
-	ref: 'B',
-	def: {
+	definition: {
 		second: [Tbjson.TYPES.ARRAY, 'A'],
 		anotherString: Tbjson.TYPES.STRING,
 		number: Tbjson.TYPES.FLOAT32,
@@ -86,8 +84,7 @@ class C {
 	}
 }
 C.tbjson = {
-	ref: 'C',
-	def: {
+	definition: {
 		first: [Tbjson.TYPES.ARRAY, 'B']
 	}
 }
@@ -136,7 +133,7 @@ for (let i = 0; i < root.typedArray.length; ++i) {
 
 		console.log('Done');
 	} catch(e) {
-		console.error('Error running benchmarks for Tbjson: ' + e);
+		console.error('Error running benchmarks for Tbjson: ',  e);
 	}
 
 })();

@@ -95,7 +95,8 @@ export default class BufferReader {
 
 	readTypedArray(type, length) {
 
-		let buffer = this.buffer.buffer.slice(this.offset, this.offset + length);
+		let byteOffset = this.buffer.byteOffset + this.offset;
+		let buffer = this.buffer.buffer.slice(byteOffset, byteOffset + length);
 		this.offset += length;
 
 		switch (type) {

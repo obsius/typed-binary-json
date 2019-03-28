@@ -1,10 +1,21 @@
-import fs from 'fs';
+import fs, { exists } from 'fs';
 import Tbjson from './src/Tbjson';
 
-class A {
+class Z {
 	x = 100000.666666666666;
 	y = -999999.999;
 	z = 1234.56789;
+}
+
+Z.tbjson = {
+	definition: {
+		x: Tbjson.TYPES.FLOAT32,
+		z: Tbjson.TYPES.FLOAT32,
+		y: Tbjson.TYPES.FLOAT32
+	}
+};
+
+class A extends Z {
 	a = null;
 	q = '09123123123123';
 }
@@ -22,14 +33,14 @@ A.tbjson = {
 class B {
 	as = [];
 	start = "START";
-	u8 = new Uint8Array(100000);
-	u16 = new Uint16Array(100000);
-	i32 = new Int32Array(100000);
-	f64 = new Float64Array(1000000);
+	u8 = new Uint8Array(2);
+	u16 = new Uint16Array(2);
+	i32 = new Int32Array(2);
+	f64 = new Float64Array(2);
 	end = "END";
 
 	constructor() {
-		for (let i = 0; i < 10; ++i) {
+		for (let i = 0; i < 1000000; ++i) {
 			this.as.push(new A());
 		}
 		
@@ -64,8 +75,15 @@ let root = {
 	b: new B(),
 	c: null
 };
-
-
+/*
+console.time();
+let x = [];
+for (let i = 0; i < 1000000; ++i) {
+	x.push( new A());
+}
+console.timeEnd();
+process.exit(1);
+*/
 
 /*
 console.time();
@@ -78,40 +96,49 @@ exit;
 (async function() {
 
 	try {
-		console.time();
+		
 
 		let tbjson = new Tbjson();
 
-		tbjson.registerClass('A', {
-			x: Tbjson.TYPES.FLOAT32,
-			z: Tbjson.TYPES.FLOAT32,
-			y: Tbjson.TYPES.FLOAT32
+		tbjson.registerPrototype(Z);
+
+		tbjson.registerPrototype({
+			prototype: A,
+			definition: {
+				a: Tbjson.TYPES.INT8,
+				q: Tbjson.TYPES.STRING
+			}
 		});
 
-		tbjson.registerClass('B', {
-			as: [Tbjson.TYPES.ARRAY, 'A'],
-			start: Tbjson.TYPES.STRING,
-			u8: [Tbjson.TYPES.TYPED_ARRAY, Tbjson.TYPES.UINT8],
-			u16: [Tbjson.TYPES.TYPED_ARRAY, Tbjson.TYPES.UINT16],
-			i32: [Tbjson.TYPES.TYPED_ARRAY, Tbjson.TYPES.INT32],
-			f64: [Tbjson.TYPES.TYPED_ARRAY, Tbjson.TYPES.FLOAT64],
-			end: Tbjson.TYPES.STRING
+		tbjson.registerPrototype({
+			prototype: B,
+			definition: {
+				as: [Tbjson.TYPES.ARRAY, A],
+				start: Tbjson.TYPES.STRING,
+				u8: [Tbjson.TYPES.TYPED_ARRAY, Tbjson.TYPES.UINT8],
+				u16: [Tbjson.TYPES.TYPED_ARRAY, Tbjson.TYPES.UINT16],
+				i32: [Tbjson.TYPES.TYPED_ARRAY, Tbjson.TYPES.INT32],
+				f64: [Tbjson.TYPES.TYPED_ARRAY, Tbjson.TYPES.FLOAT64],
+				end: Tbjson.TYPES.STRING
+			}
 		});
+
+		tbjson.finalizePrototypes();
 
 		let data;
 		let buffer;
 
-		await tbjson.serializeToFile('tbjson.tbj', root);
+	//	await tbjson.serializeToFile('tbjson.__tbj', root);
 
-	//	buffer = tbjson.serializeToBuffer(root);
+		buffer = tbjson.serializeToBuffer(root);
 
-		fs.writeFileSync('___M.json', tbjson.getHeaderAsBuffer());
+		//fs.writeFileSync('___M.json', tbjson.getHeaderAsBuffer());
+		console.time();
+		data = tbjson.parseBuffer(buffer);
 
-	//	data = tbjson.parseBuffer(buffer);
+	//	data = tbjson.parseFileAsBuffer('tbjson.__tbj');
 
-		data = tbjson.parseFileAsBuffer('tbjson.tbj');
-
-	//	console.log(data);
+		//console.log(data.b.as);
 		//console.log(JSON.stringify(data));
 
 		console.timeEnd();
