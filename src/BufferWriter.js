@@ -107,6 +107,8 @@ export default class BufferWriter {
 				break;
 
 			case STRING:
+				// TODO: CASTING PERFORMANCE ISSUES!!!
+				val = '' + val;
 				this.checkSize(val.length + SIZE_UINT8);
 				this.buffer.write(val, this.offset, val.length, this.strEncoding);
 				this.offset += val.length;

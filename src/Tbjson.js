@@ -753,11 +753,9 @@ export default class Tbjson {
 	serialize(obj) {
 		switch (typeof obj) {
 
-			// TODO: CASTING PERFORMANCE ISSUES!!!
-
 			// bool
 			case 'boolean':
-				this.writer.write(BOOL, !!obj);
+				this.writer.write(BOOL, obj);
 				return BOOL;
 
 			// number, use the default number type
@@ -767,7 +765,7 @@ export default class Tbjson {
 
 			// string
 			case 'string':
-				this.writer.write(STRING, '' + obj);
+				this.writer.write(STRING, obj);
 				return STRING;
 
 			// null, object, or array
