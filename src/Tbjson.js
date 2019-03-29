@@ -546,7 +546,7 @@ export default class Tbjson {
 
 			// prototypes (preserve proto constructors for typed parsing)
 			this.protoRefs = header.protoRefs;
-			for (let code in this.protoDefs) {
+			for (let code in header.protoDefs) {
 				if (this.protos[code]) {
 					this.protos[code].definition = header.protoDefs[code];
 				} else {
@@ -753,9 +753,11 @@ export default class Tbjson {
 	serialize(obj) {
 		switch (typeof obj) {
 
+			// TODO: CASTING PERFORMANCE ISSUES!!!
+
 			// bool
 			case 'boolean':
-				this.writer.write(BOOL, obj);
+				this.writer.write(BOOL, !!obj);
 				return BOOL;
 
 			// number, use the default number type
@@ -765,7 +767,7 @@ export default class Tbjson {
 
 			// string
 			case 'string':
-				this.writer.write(STRING, obj);
+				this.writer.write(STRING, '' + obj);
 				return STRING;
 
 			// null, object, or array

@@ -20,7 +20,7 @@ import Tbjson from './src/Tbjson';
 		//fs.writeFileSync('___M.json', tbjson.getHeaderAsBuffer());
 		console.time();
 
-		data = tbjson.parseFileAsBuffer('AA.op3');
+		data = tbjson.parseFileAsBuffer('aaad.op3');
 
 		console.log(data);
 		//console.log(data.b.as);
