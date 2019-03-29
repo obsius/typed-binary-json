@@ -67,6 +67,8 @@ export default class Tbjson {
 	nextProtoCode = PROTOTYPE_OFFSET;
 	nextObjCode = 0;
 
+	finalized = false;
+
 	// defaults
 	options = {
 		encStringAs: DEFAULT_STR_ENCODING,
@@ -117,12 +119,15 @@ export default class Tbjson {
 	 */
 	registerPrototype(prototype) {
 
+		if (this.finalized) { return; }
+
 		// a prototype
 		if (typeof prototype == 'function') {
 
 			// check if it's a known tbjson prototype
 			if (prototype.tbjson) {
 
+				// TODO: REMOVE THIS
 				if (!prototype.tbjson.definition) {
 					throw new Error(`Missing definition for "${prototype.name}"`);
 				}
@@ -149,17 +154,25 @@ export default class Tbjson {
 			this.protoRefs[prototype.reference] = code;
 		}
 
-		// this code has not been defined, so set the prototype
-		if (!this.protos[code] && prototype.definition) {
-
-			// get the parent code
-			let parent = (!prototype.noInherit && prototype.parentReference) ? prototype.parentReference : getParent(prototype.prototype);
-			let parentCode = parent ? this.registerPrototype(parent) : null;
+		// this code has not been defined
+		if (!this.protos[code] || !this.protos[code].definition) {
 
 			// set the prototype
-			this.protos[code] = new Prototype(this.fmtDef(prototype.definition), prototype.prototype, parentCode, prototype.noInherit);
-		}
+			if (prototype.definition) {
 
+				// get the parent code
+				let parent = (!prototype.noInherit && prototype.parentReference) ? prototype.parentReference : getParent(prototype.prototype);
+				let parentCode = parent ? this.registerPrototype(parent) : null;
+
+				// set the prototype
+				this.protos[code] = new Prototype(this.fmtDef(prototype.definition), prototype.prototype, parentCode, prototype.noInherit);
+
+			// set empty if there is no prototype
+			} else {
+				this.protos[code] = {}
+			}
+		}
+		
 		return code;
 	}
 
@@ -266,6 +279,8 @@ export default class Tbjson {
 				}
 			}
 		}
+
+		this.finalized = true;
 	}
 
 	/*-----------------------------------------------------------------------*/
@@ -884,7 +899,7 @@ export default class Tbjson {
 
 				// defined
 				if (proto.definition) {
-					return this.parse(proto.definition, proto.protoype);
+					return this.parse(proto.definition, proto.prototype);
 
 				// undefined
 				} else {
