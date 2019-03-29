@@ -9,7 +9,11 @@ export default function(Tbjson, stringify) {
 		object = {
 			string: "string",
 			bool: true,
-			float: 11.001
+			float: 11.001,
+			subObject: {
+				uint8: 255,
+				string: 'string'
+			}
 		};
 	}
 	A.tbjson = {
@@ -30,7 +34,7 @@ export default function(Tbjson, stringify) {
 	};
 
 	return [
-		stringify(x.a.object),
-		stringify(tbjson.parseBuffer(tbjson.serializeToBuffer(x), ['a', 'object']))
+		stringify(x.a.object.subObject),
+		stringify(tbjson.parseBuffer(tbjson.serializeToBuffer(x), ['a', 'object', 'subObject']))
 	];
 }

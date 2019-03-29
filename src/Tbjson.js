@@ -876,8 +876,12 @@ export default class Tbjson {
 	 */
 	parseAtSelection(def, selector, path = [], prototype) {
 
+		// forward a plain object
+		if (typeof def == 'number' && def == OBJECT) {
+			return this.parseAtSelection(this.objs[this.reader.read(UINT32)], selector, path);
+
 		// forward a known prototype
-		if (typeof def == 'number' && def < ARRAY_OFFSET) {
+		} else if (typeof def == 'number' && def >= PROTOTYPE_OFFSET && def < ARRAY_OFFSET) {
 			let proto = this.protos[def];
 			return this.parseAtSelection(proto.definition ? proto.definition : this.objs[this.reader.read(UINT32)], selector, path, proto.prototype);
 			
