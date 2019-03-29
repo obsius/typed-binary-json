@@ -1,14 +1,11 @@
 import fs from 'fs';
 import Tbjson from './src/Tbjson';
 
-
 (async function() {
 
-	try {
-		
+	try {		
 
 		let tbjson = new Tbjson();
-
 
 		let data;
 		let buffer;

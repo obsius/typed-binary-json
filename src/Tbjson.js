@@ -377,8 +377,9 @@ export default class Tbjson {
 	 * Parse a TBJSON containing buffer into ab object. Fastest, but uses the most memory.
 	 * 
 	 * @param {buffer} buffer - buffer to read from
+	 * @param {array} selector - anarray that indicates the selected object path
 	 */
-	parseBuffer(buffer) {
+	parseBuffer(buffer, selector = null) {
 		try {
 
 			if (!buffer) {
@@ -399,7 +400,11 @@ export default class Tbjson {
 			this.parseHeader(this.reader.read(STRING, headerLength));
 
 			// construct the object
-			return this.parse(this.root);
+			if (selector) {
+				return this.parseAtSelection(this.root, selector);
+			} else {
+				return this.parse(this.root);
+			}
 
 		} catch(e) {
 			e.message = 'Tbjson failed to parse the buffer: ' + e.message;
@@ -412,8 +417,9 @@ export default class Tbjson {
 	 * Parse a TBJSON containing stream into an object. Slower, but uses the least memory.
 	 * 
 	 * @param {stream} stream - stream to read from
+	 * @param {array} selector - anarray that indicates the selected object path
 	 */
-	parseStream(stream) {
+	parseStream(stream, selector = null) {
 		return new Promise(async (res, rej) => {
 
 			this.reader = new StreamBufferReader(stream);
@@ -430,18 +436,23 @@ export default class Tbjson {
 			this.parseHeader(await this.reader.read(STRING, headerLength));
 
 			// construct the object
-			res(await this.parse(this.root));
+			if (selector) {
+				res(await this.parseAtSelection(this.root, selector));
+			} else {
+				res(await this.parse(this.root));
+			}
 		});
 	}
 
 	/**
 	 * Parse a TBJSON file into the object it represents. Faster, but uses more memory.
 	 * 
-	 * @param {string} filename - filename / path to read from 
+	 * @param {string} filename - filename / path to read from
+	 * @param {array} selector - anarray that indicates the selected object path
 	 */
-	parseFileAsBuffer(filename) {
+	parseFileAsBuffer(filename, selector = null) {
 		try {
-			return this.parseBuffer(fs.readFileSync(filename));
+			return this.parseBuffer(fs.readFileSync(filename), selector);
 		} catch (e) {
 			e.message = `Tbjson failed to parse "${filename}": ` + e.message;
 			throw e;
@@ -452,10 +463,11 @@ export default class Tbjson {
 	 * Parse a TBJSON file into the object it represents. Slower, but uses less memory.
 	 * 
 	 * @param {string} filename - filename / path to read from
+	 * @param {array} selector - anarray that indicates the selected object path
 	 */
-	async parseFileAsStream(filename) {
+	async parseFileAsStream(filename, selector = null) {
 		try {
-			return await this.parseStream(fs.createReadStream(filename));
+			return await this.parseStream(fs.createReadStream(filename), selector);
 		} catch (e) {
 			e.message = `Tbjson failed to parse "${filename}": ` + e.message;
 			throw e;
@@ -855,6 +867,46 @@ export default class Tbjson {
 	}
 
 	/**
+	 * Parse a definition, but only return the portion that matches the selector.
+	 * 
+	 * TODO: IMPLEMENT NULL READER TO SKIP ENTRIES FOR PERFORMANCE
+	 * 
+	 * @param { object | array | number } def - the definition specifying how to decode the binary data
+	 * @param {array} selector - quit early and return the value selected by this
+	 */
+	parseAtSelection(def, selector, path = [], prototype) {
+
+		// forward a known prototype
+		if (typeof def == 'number' && def < ARRAY_OFFSET) {
+			let proto = this.protos[def];
+			return this.parseAtSelection(proto.definition ? proto.definition : this.objs[this.reader.read(UINT32)], selector, path, proto.prototype);
+			
+		// control the object path
+		} else if (typeof def == 'object' && !Array.isArray(def)) {
+
+			let selection = selector.shift();
+
+			for (let key in def) {
+				if (key == selection) {
+					if (!selector.length) {
+						return this.parse(def[key], prototype);
+					} else {
+						return this.parseAtSelection(def[key], selector, path.concat([selection]));
+					}
+				}
+
+				this.parse(def[key]);
+			}
+
+		// read to the void
+		} else {
+			this.parse(def);
+		}
+
+		return null;
+	}
+
+	/**
 	 * Parse a definition.
 	 * 
 	 * @param { object | array | number } def - the definition specifying how to decode the binary data
@@ -902,17 +954,8 @@ export default class Tbjson {
 
 			// known prototype
 			} else if (def < ARRAY_OFFSET) {
-				
 				let proto = this.protos[def];
-
-				// defined
-				if (proto.definition) {
-					return this.parse(proto.definition, proto.prototype);
-
-				// undefined
-				} else {
-					return this.parse(this.objs[this.reader.read(UINT32)], proto.prototype);
-				}
+				return this.parse(proto.definition ? proto.definition : this.objs[this.reader.read(UINT32)], proto.prototype);
 
 			// variable-length fixed typed array 
 			} else {

@@ -7,6 +7,8 @@ import inheritance from './inheritance';
 import nullable from './nullable';
 import typedArray from './typedArray';
 import plainInTyped from './plainInTyped';
+import selection from './selection';
+import typedSelection from './typedSelection';
 
 function stringify(val) {
 	return JSON.stringify(val, (name, val) => {
@@ -26,6 +28,8 @@ function run() {
 	runTest('Nullable', nullable);
 	runTest('Typed Array', typedArray);
 	runTest('Plain In Typed', plainInTyped);
+	runTest('Selection', selection);
+	runTest('Typed Selection', typedSelection);
 }
 
 function runTest(name, fn) {
