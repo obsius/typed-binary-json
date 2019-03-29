@@ -38,4 +38,4 @@ export const NULLABLE_OFFSET =    16;
 export const TYPED_ARRAY_OFFSET = 32;
 export const TYPE_OFFSET =        48;
 export const PROTOTYPE_OFFSET =   64;
-export const ARRAY_OFFSET =       128;
+export const ARRAY_OFFSET =       256;

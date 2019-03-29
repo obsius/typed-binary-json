@@ -157,20 +157,16 @@ export default class Tbjson {
 		// this code has not been defined
 		if (!this.protos[code] || !this.protos[code].definition) {
 
-			// set the prototype
+			let parentCode;
+
+			// get the parent code
 			if (prototype.definition) {
-
-				// get the parent code
 				let parent = (!prototype.noInherit && prototype.parentReference) ? prototype.parentReference : getParent(prototype.prototype);
-				let parentCode = parent ? this.registerPrototype(parent) : null;
-
-				// set the prototype
-				this.protos[code] = new Prototype(this.fmtDef(prototype.definition), prototype.prototype, parentCode, prototype.noInherit);
-
-			// set empty if there is no prototype
-			} else {
-				this.protos[code] = {}
+				parentCode = parent ? this.registerPrototype(parent) : null;
 			}
+
+			// set the prototype
+			this.protos[code] = new Prototype(this.fmtDef(prototype.definition), prototype.prototype, parentCode, prototype.noInherit);
 		}
 		
 		return code;
@@ -385,6 +381,10 @@ export default class Tbjson {
 	parseBuffer(buffer) {
 		try {
 
+			if (!buffer) {
+				throw new Error('Null buffer passed in');
+			}
+
 			this.reader = new BufferReader(buffer);
 
 			// validate the buffer type
@@ -483,7 +483,7 @@ export default class Tbjson {
 		// get the prototype definitions
 		let protoDefs = {};
 		for (let code in this.protos) {
-			protoDefs[code] = this.protos[code].definition;
+			protoDefs[code] = this.protos[code].definition ? this.protos[code].definition : null;
 		}
 
 		return {
@@ -544,25 +544,20 @@ export default class Tbjson {
 				this.types[code] = new Type(Function(header.typeDefs[code].serializer), Function(header.typeDefs[code].deserializer));
 			}
 
-			/* prototypes */
-
-		//	let oldProtos = this.protos;
-
-		//	this.protoRefs = header.protoRefs;
-		//	this.protos = {};
-
-		//	for (let code in header.protoDefs) {
-		//		this.protos[code] = new Prototype(header.protoDefs[code]);
-		//	}
-
-			// reassign old protos
-		//	for (let oldProto of oldProto) {
-
-		//	}
+			// prototypes (preserve proto constructors for typed parsing)
+			this.protoRefs = header.protoRefs;
+			for (let code in this.protoDefs) {
+				if (this.protos[code]) {
+					this.protos[code].definition = header.protoDefs[code];
+				} else {
+					this.protos[code] = new Prototype(header.protoDefs[code]);
+				}
+			}
 
 			// unknown objects
 			this.objs = header.objs;
 
+			// set the root
 			this.root = header.root;
 
 		} catch (e) {
@@ -605,8 +600,12 @@ export default class Tbjson {
 			// object or array
 			case 'object':
 
+				// null
+				if (!def) {
+					return null;
+
 				// array
-				if (Array.isArray(def)) {
+				} else if (Array.isArray(def)) {
 
 					// typed array
 					if (def.length == 2 && def[0] == ARRAY) {
@@ -659,9 +658,18 @@ export default class Tbjson {
 
 		// no def, could be a known but undefined prototype, or a plain object, kick back to the serializer
 		if (!def) {
+
+			// write the code
 			let code = this.nextObjCode++;
 			this.writer.write(UINT32, code);
-			this.objs[code] = this.serialize(obj);
+
+			// write the obj
+			let ref = {};
+			for (let key in obj) {
+				ref[key] = this.serialize(obj[key]);
+			}
+			this.objs[code] = ref;
+
 			return;
 		}
 
@@ -764,7 +772,7 @@ export default class Tbjson {
 			case 'object':
 
 				// null
-				if (obj == null) {
+				if (!obj) {
 					return NULL;
 
 				// array

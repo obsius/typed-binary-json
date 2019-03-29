@@ -10,7 +10,8 @@ export default function(Tbjson, stringify) {
 			float: 10.994,
 			bool: false
 		},
-		null: null
+		null: null,
+		undefined: undefined
 	};
 
 	return [
