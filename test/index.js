@@ -4,6 +4,7 @@ import plain from './plain.js';
 import typed from './typed.js';
 import prototype from './prototype';
 import inheritance from './inheritance';
+import nulls from './nulls';
 import nullable from './nullable';
 import typedArray from './typedArray';
 import plainInTyped from './plainInTyped';
@@ -26,6 +27,7 @@ function run() {
 	runTest('Typed', typed);
 	runTest('Prototype', prototype);
 	runTest('Inheritance', inheritance);
+	runTest('Nulls', nulls);
 	runTest('Nullable', nullable);
 	runTest('Typed Array', typedArray);
 	runTest('Plain In Typed', plainInTyped);
