@@ -9,6 +9,7 @@ import typedArray from './typedArray';
 import plainInTyped from './plainInTyped';
 import selection from './selection';
 import typedSelection from './typedSelection';
+import strings from './strings';
 
 function stringify(val) {
 	return JSON.stringify(val, (name, val) => {
@@ -30,20 +31,25 @@ function run() {
 	runTest('Plain In Typed', plainInTyped);
 	runTest('Selection', selection);
 	runTest('Typed Selection', typedSelection);
+	runTest('Strings', strings);
 }
 
 function runTest(name, fn) {
 	try {
 	
 		console.log(`Running ${name}...`); 
+		
+		let startTime = (new Date()).getTime();
 
 		let results = fn(Tbjson, stringify);
 
+		let time = (new Date()).getTime() - startTime;
+
 		if (results[0] != results[1]) {
-			console.log('Failed');
+			console.log(`Failed [${time} ms]`);
 			console.log(results);
 		} else {
-			console.log('Passed');
+			console.log(`Passed [${time} ms]`);
 		}
 	} catch (e) {
 		console.log('Error running test: ', e);

@@ -673,7 +673,7 @@ export default class Tbjson {
 
 			// write the code
 			let code = this.nextObjCode++;
-			this.writer.writeVariableUint(code);
+			this.writer.write(UINT16, code);
 
 			// write the obj
 			let ref = {};
@@ -711,7 +711,7 @@ export default class Tbjson {
 
 			// primitive typed array
 			} else if (def < TYPE_OFFSET) {
-				this.writer.writeVariableUint(obj.buffer.byteLength);
+				this.writer.write(UINT32, obj.buffer.byteLength);
 				this.writer.writeBuffer(Buffer.from(obj.buffer));
 
 			// custom type
@@ -731,7 +731,7 @@ export default class Tbjson {
 			//variable-length fixed typed array 
 			} else {
 				// write out the length
-				this.writer.writeVariableUint(obj.length);
+				this.writer.write(UINT32, obj.length);
 
 				for (let i = 0; i < obj.length; ++i) {
 					this.serializeDef(obj[i], def - ARRAY_OFFSET);
@@ -819,7 +819,7 @@ export default class Tbjson {
 					}
 
 					if (ref) {
-						this.writer.writeVariableUint(obj.buffer.byteLength);
+						this.writer.write(UINT32, obj.buffer.byteLength);
 						this.writer.writeBuffer(Buffer.from(obj.buffer));
 					}
 
@@ -878,12 +878,12 @@ export default class Tbjson {
 
 		// forward a plain object
 		if (typeof def == 'number' && def == OBJECT) {
-			return this.parseAtSelection(this.objs[this.reader.readVariableUint()], selector, path);
+			return this.parseAtSelection(this.objs[this.reader.read(UINT16)], selector, path);
 
 		// forward a known prototype
 		} else if (typeof def == 'number' && def >= PROTOTYPE_OFFSET && def < ARRAY_OFFSET) {
 			let proto = this.protos[def];
-			return this.parseAtSelection(proto.definition ? proto.definition : this.objs[this.reader.readVariableUint()], selector, path, proto.prototype);
+			return this.parseAtSelection(proto.definition ? proto.definition : this.objs[this.reader.read(UINT16)], selector, path, proto.prototype);
 			
 		// control the object path
 		} else if (typeof def == 'object' && !Array.isArray(def)) {
@@ -930,7 +930,7 @@ export default class Tbjson {
 
 				// unknown object
 				} else if (def == OBJECT) {
-					return this.parse(this.objs[this.reader.readVariableUint()]);
+					return this.parse(this.objs[this.reader.read(UINT16)]);
 
 				// primitive
 				} else {
@@ -950,7 +950,7 @@ export default class Tbjson {
 
 			// primitive typed array
 			} else if (def < TYPE_OFFSET) {
-				return this.reader.readTypedArray(def - TYPED_ARRAY_OFFSET, this.reader.readVariableUint());
+				return this.reader.readTypedArray(def - TYPED_ARRAY_OFFSET, this.reader.read(UINT32));
 
 			// custom type
 			} else if (def < PROTOTYPE_OFFSET) {
@@ -959,12 +959,12 @@ export default class Tbjson {
 			// known prototype
 			} else if (def < ARRAY_OFFSET) {
 				let proto = this.protos[def];
-				return this.parse(proto.definition ? proto.definition : this.objs[this.reader.readVariableUint()], proto.prototype);
+				return this.parse(proto.definition ? proto.definition : this.objs[this.reader.read(UINT16)], proto.prototype);
 
 			// variable-length fixed typed array 
 			} else {
 
-				let length = this.reader.readVariableUint();
+				let length = this.reader.read(UINT32);
 				let objs = [];
 
 				for (let i = 0; i < length; ++i) {

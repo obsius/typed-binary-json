@@ -72,37 +72,37 @@ export default class BufferWriter {
 
 			case UINT16:
 				this.checkSize(SIZE_UINT16);
-				this.buffer.writeUInt16LE(val, this.offset);
+				this.buffer.writeUInt16BE(val, this.offset);
 				this.offset += SIZE_UINT16;
 				break;
 
 			case INT16:
 				this.checkSize(SIZE_INT16);
-				this.buffer.writeInt16LE(val, this.offset);
+				this.buffer.writeInt16BE(val, this.offset);
 				this.offset += SIZE_INT16;
 				break;
 
 			case UINT32:
 				this.checkSize(SIZE_UINT32);
-				this.buffer.writeUInt32LE(val, this.offset);
+				this.buffer.writeUInt32BE(val, this.offset);
 				this.offset += SIZE_UINT32;
 				break;
 
 			case INT32:
 				this.checkSize(SIZE_INT32);
-				this.buffer.writeInt32LE(val, this.offset);
+				this.buffer.writeInt32BE(val, this.offset);
 				this.offset += SIZE_INT32;
 				break;
 
 			case FLOAT32:
 				this.checkSize(SIZE_FLOAT32);
-				this.buffer.writeFloatLE(val, this.offset);
+				this.buffer.writeFloatBE(val, this.offset);
 				this.offset += SIZE_FLOAT32;
 				break;
 
 			case FLOAT64:
 				this.checkSize(SIZE_FLOAT64);
-				this.buffer.writeDoubleLE(val, this.offset);
+				this.buffer.writeDoubleBE(val, this.offset);
 				this.offset += SIZE_FLOAT64;
 				break;
 
@@ -119,12 +119,12 @@ export default class BufferWriter {
 	}
 
 	writeVariableUint(val) {
-		if (val < 256) {
+		if (val < 128) { // R00000000 (first bit reserved)
 			this.write(UINT8, val);
-		} else if (val < 65536) {
-			this.write(UINT16, val);
+		} else if (val < 16384) { // 1R000000 (second bit reserved)
+			this.write(UINT16, val + 32768);
 		} else {
-			this.write(UINT32, val);
+			this.write(UINT32, val + 3221225472);
 		}
 	}
 

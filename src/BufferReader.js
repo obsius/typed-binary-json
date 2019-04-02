@@ -49,32 +49,32 @@ export default class BufferReader {
 				break;
 
 			case UINT16:
-				data = this.buffer.readUInt16LE(this.offset);
+				data = this.buffer.readUInt16BE(this.offset);
 				this.offset += SIZE_UINT16;
 				break;
 
 			case INT16:
-				data = this.buffer.readInt16LE(this.offset);
+				data = this.buffer.readInt16BE(this.offset);
 				this.offset += SIZE_INT16;
 				break;
 
 			case UINT32:
-				data = this.buffer.readUInt32LE(this.offset);
+				data = this.buffer.readUInt32BE(this.offset);
 				this.offset += SIZE_UINT32;
 				break;
 
 			case INT32:
-				data = this.buffer.readInt32LE(this.offset);
+				data = this.buffer.readInt32BE(this.offset);
 				this.offset += SIZE_INT32;
 				break;
 
 			case FLOAT32:
-				data = this.buffer.readFloatLE(this.offset);
+				data = this.buffer.readFloatBE(this.offset);
 				this.offset += SIZE_FLOAT32;
 				break;
 
 			case FLOAT64:
-				data = this.buffer.readDoubleLE(this.offset);
+				data = this.buffer.readDoubleBE(this.offset);
 				this.offset += SIZE_FLOAT64;
 				break;
 
@@ -89,12 +89,12 @@ export default class BufferReader {
 	}
 
 	readVariableUint() {
-		if (this.buffer[this.offset] < 255) {
+		if (this.buffer[this.offset] < 128) {
 			return this.read(UINT8);
-		} else if (this.buffer[this.offset + 1] < 255) {
-			return this.read(UINT16);
+		} else if (this.buffer[this.offset] < 192) {
+			return this.read(UINT16) - 32768;
 		} else {
-			return this.read(UINT32);
+			return this.read(UINT32) - 3221225472;
 		}
 	}
 
