@@ -28,7 +28,7 @@ export default class BufferReader {
 		this.buffer = buffer;
 	}
 
-	read(type, length = 0) {
+	read(type) {
 		let data;
 
 		switch (type) {
@@ -79,17 +79,28 @@ export default class BufferReader {
 				break;
 
 			case STRING:
-				if (length) {
-					data = this.buffer.toString('utf-8', this.offset, this.offset + length);
-					this.offset += length;
-				} else {
-					length = this.nextNullAt();
-					data = this.buffer.toString('utf-8', this.offset, length);
-					this.offset = length + 1;
-				}
+				let length = this.readVariableUint();
+				data = this.buffer.toString('utf-8', this.offset, this.offset + length);
+				this.offset += length;
 				break;
 		}
 
+		return data;
+	}
+
+	readVariableUint() {
+		if (this.buffer[this.offset] < 255) {
+			return this.read(UINT8);
+		} else if (this.buffer[this.offset + 1] < 255) {
+			return this.read(UINT16);
+		} else {
+			return this.read(UINT32);
+		}
+	}
+
+	readFixedLengthString(length) {
+		let data = this.buffer.toString('utf-8', this.offset, this.offset + length);
+		this.offset += length;
 		return data;
 	}
 

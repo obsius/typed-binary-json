@@ -107,14 +107,31 @@ export default class BufferWriter {
 				break;
 
 			case STRING:
-				// TODO: CASTING PERFORMANCE ISSUES!!!
-				val = '' + val;
-				this.checkSize(val.length + SIZE_UINT8);
-				this.buffer.write(val, this.offset, val.length, this.strEncoding);
-				this.offset += val.length;
-				this.buffer.writeUInt8(0, this.offset);
-				this.offset += SIZE_UINT8;
+				if (typeof val != 'string' || !val.length) {
+					this.write(UINT8, 0);
+				} else {
+					this.writeVariableUint(val.length);
+					this.checkSize(val.length);
+					this.buffer.write(val, this.offset, val.length, this.strEncoding);
+					this.offset += val.length;
+				}
 		}
+	}
+
+	writeVariableUint(val) {
+		if (val < 256) {
+			this.write(UINT8, val);
+		} else if (val < 65536) {
+			this.write(UINT16, val);
+		} else {
+			this.write(UINT32, val);
+		}
+	}
+
+	writeFixedLengthStr(val) {
+		this.checkSize(val.length);
+		this.buffer.write(val, this.offset, val.length, this.strEncoding);
+		this.offset += val.length;
 	}
 
 	writeBuffer(buffer) {
