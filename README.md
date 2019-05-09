@@ -2,7 +2,9 @@
 
 Typed Binary JSON or TBJSON, is a binary serialization format that is compatible with JSON. It stores known object prototypes in a JSON header, and serializes the data in a binary format following the header.  
   
-TBJSON is useful for serializing known objects, classes, or types, otherwise it will offer little advantage if any in terms of size or performance over JSON.
+TBJSON is useful for serializing known objects, classes, or types, otherwise it will offer little advantage if any in terms of size or performance over JSON.  
+
+For a browser compatible version of this package, use [TBJSON in the Browser](https://www.npmjs.com/package/typed-binary-json-browser)
 
 
 ## Format
