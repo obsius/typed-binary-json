@@ -9,6 +9,7 @@ import {
 	FLOAT32,
 	FLOAT64,
 	STRING,
+	UNKNOWN,
 	
 	SIZE_UINT8,
 	SIZE_INT8,
@@ -83,6 +84,9 @@ export default class BufferReader {
 				data = this.buffer.toString('utf-8', this.offset, this.offset + length);
 				this.offset += length;
 				break;
+
+			case UNKNOWN:
+				data = this.read(this.read(UINT8));
 		}
 
 		return data;

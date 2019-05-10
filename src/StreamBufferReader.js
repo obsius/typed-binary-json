@@ -60,7 +60,6 @@ export default class StreamBufferReader {
 				} else {
 					this.readUntilNull();
 				}
-
 		}
 	}
 

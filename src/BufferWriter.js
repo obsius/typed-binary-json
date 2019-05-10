@@ -10,6 +10,7 @@ import {
 	FLOAT32,
 	FLOAT64,
 	STRING,
+	UNKNOWN,
 
 	SIZE_UINT8,
 	SIZE_INT8,
@@ -18,7 +19,7 @@ import {
 	SIZE_UINT32,
 	SIZE_INT32,
 	SIZE_FLOAT32,
-	SIZE_FLOAT64,
+	SIZE_FLOAT64
 } from './constants';
 
 const DEFAULT_BUFFER_SIZE = 16384;
@@ -114,6 +115,25 @@ export default class BufferWriter {
 					this.checkSize(val.length);
 					this.buffer.write(val, this.offset, val.length, this.strEncoding);
 					this.offset += val.length;
+				}
+				break;
+
+			case UNKNOWN:
+				switch (typeof val) {
+					case 'boolean':
+						this.write(UINT8, BOOL);
+						this.write(BOOL, val);
+						break;
+					case 'number':
+						this.write(UINT8, FLOAT64);
+						this.write(FLOAT64, val);
+						break;
+					case 'string':
+						this.write(UINT8, STRING);
+						this.write(STRING, val);
+						break;
+					default:
+						this.write(NULL);
 				}
 		}
 	}

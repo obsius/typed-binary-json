@@ -20,6 +20,7 @@ export const ARRAY =       11;
 export const OBJECT =      12;
 export const NULLABLE =    13;
 export const TYPED_ARRAY = 14;
+export const UNKNOWN =     15;
 
 // primitive sizes
 export const SIZE_NULL =    1;
