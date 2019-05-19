@@ -13,6 +13,15 @@ export default function(Tbjson, stringify) {
 		string = 'string';
 	}
 
+	class C extends A {
+		b = new B();
+	}
+	C.tbjson = {
+		definition: {
+			b: B
+		}
+	};
+
 	let x = {
 		b: new B()
 	};

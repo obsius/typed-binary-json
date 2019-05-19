@@ -57,7 +57,6 @@ export default class Tbjson {
 	protos = {};
 
 	// for plain objects that are inside of known prototypers
-	// maybe TODO: objRefs = {};
 	objs = {};
 
 	// binary definition tree
@@ -172,6 +171,39 @@ export default class Tbjson {
 		
 		return code;
 	}
+
+	/**
+	 * Register a prototype (constructor only) recursively, automatically adding all classes that it references.
+	 * 
+	 * Example:
+	 *
+	 * Tbjson.registerPrototypeRecur(Point); // point must have tbjson set on it: Point.tbjson = { definition: ... } 
+	 * 
+	 * @param {function} prototype - prototype constructor
+	 */
+	registerPrototypeRecur(prototype) {
+
+		if (typeof prototype == 'function') {
+
+			if (!prototype.tbjson) { return; }
+
+			this.registerPrototype(prototype);
+
+			prototype = prototype.tbjson.definition;
+		}
+
+		if (prototype != null && typeof prototype == 'object') {
+			if (Array.isArray(prototype)) {
+				for (let i = 0; i < prototype.length; ++i) {
+					this.registerPrototypeRecur(prototype[i]);
+				}
+			} else {
+				for (let key in prototype) {
+					this.registerPrototypeRecur(prototype[key]);
+				}
+			}
+		}
+	};
 
 	/**
 	 * Register an array of prototypes.
@@ -621,27 +653,30 @@ export default class Tbjson {
 				} else if (Array.isArray(def)) {
 
 					// typed array
-					if (def.length == 2 && def[0] == ARRAY) {
-						return ARRAY_OFFSET + this.fmtDef(def[1]);
+					if (def.length == 2) {
+						if (def[0] == ARRAY) {
+							return ARRAY_OFFSET + this.fmtDef(def[1]);
 
-					// nullable primitive
-					} else if (def.length == 2 && def[0] == NULLABLE) {
-						return NULLABLE_OFFSET + this.fmtDef(def[1]);
+						// nullable primitive
+						} else if (def[0] == NULLABLE) {
+							return NULLABLE_OFFSET + this.fmtDef(def[1]);
 
-					// primitive typed array
-					} else if (def.length == 2 && def[0] == TYPED_ARRAY) {
-						return TYPED_ARRAY_OFFSET + this.fmtDef(def[1]);
+						// primitive typed array
+						} else if (def[0] == TYPED_ARRAY) {
+							return TYPED_ARRAY_OFFSET + this.fmtDef(def[1]);
+
+						// object
+						} else if (def[0] == OBJECT) {
+							return this.fmtDef(def[0]);
+						}
+					}
 
 					// fixed length array
-					} else {
-						let fmtDef = [];
-
-						for (let i = 0; i < def.length; ++i) {
-							fmtDef.push(this.fmtDef(def[i]));
-						}
-
-						return fmtDef;
+					let fmtDef = [];
+					for (let i = 0; i < def.length; ++i) {
+						fmtDef.push(this.fmtDef(def[i]));
 					}
+					return fmtDef;
 
 				// simple object
 				} else {
@@ -994,6 +1029,83 @@ export default class Tbjson {
 }
 
 Tbjson.TYPES = { NULL, BOOL, INT8, UINT8, INT16, UINT16, INT32, UINT32, FLOAT32, FLOAT64, STRING, ARRAY, OBJECT, NULLABLE, TYPED_ARRAY, UNKNOWN };
+
+/**
+ * Cast a plain object into the typed object it represents.
+ * 
+ * @param {string} obj - object to parse
+ * @param {function} obj - prototype to cast into
+ */
+Tbjson.cast = (obj, prototype = {}, definitions = {}) => {
+
+	// object or array with a definition
+	if (typeof obj == 'object') {
+
+		// array
+		if (Array.isArray(obj)) {
+
+			let typedObj = [];
+
+			// typed array
+			if (Array.isArray(prototype) && prototype.length == 2 && prototype[0] == ARRAY) {
+				for (let i = 0; i < obj.length; ++i) {
+					typedObj.push(Tbjson.cast(obj[i], prototype[1], definitions));
+				}
+			// unknown array
+			} else {
+				for (let i = 0; i < obj.length; ++i) {
+					typedObj.push(Tbjson.cast(obj[i], prototype[i], definitions));
+				}
+			}
+
+			return typedObj;
+
+		// uniform value object
+		} else if (Array.isArray(prototype) && prototype.length == 2 && prototype[0] == OBJECT) {
+
+			let typedObj = {};
+
+			for (let key in obj) {
+				typedObj[key] = Tbjson.cast(obj[key], prototype[1], definitions);
+			}
+
+			return typedObj;
+
+		// object
+		} else if (prototype.tbjson && prototype.tbjson.definition) {
+
+			let definition;
+
+			// use map
+			if (definitions[prototype.name]) {
+				definition = definitions[prototype.name];
+
+			// check for parent
+			} else {
+
+				definition = prototype.tbjson.definition;
+
+				for (let parent = prototype; parent = getParent(parent);) {
+					if (!parent.tbjson || !parent.tbjson.definition) { return; }
+					definition = Object.assign({}, parent.tbjson.definition, definition);
+				}
+
+				definitions[prototype.name] = definition;
+			}
+
+			let typedObj = prototype ? new prototype() : {};
+
+			for (let key in obj) {
+				typedObj[key] = Tbjson.cast(obj[key], definition[key], definitions);
+			}
+
+			return typedObj;
+		}
+	}
+
+	// primitive
+	return obj;
+}
 
 /* internal */
 

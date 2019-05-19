@@ -40,6 +40,30 @@ protos | Definitions for known prototypes or classes that are referenced in the 
 objs | Definitions for unknown objects that are referenced in known prototypes.
 root | The object that was serialized. Contains the definition needed to decode the binary format.
 
+### Types
+
+The types used by TBJSON.
+
+Type | Code | Definition
+-|-|-
+Primitives |-|-
+NULL | 0 | Null value.
+BOOL | 1 | Boolean.
+UINT8 | 2 | 8 bit unsigned integer.
+INT8 | 3 | 8 bit signed integer.
+UINT16 | 4 | 16 bit unsigned integer.
+INT16 | 5 | 16 bit signed integer.
+UINT32 | 6 | 32 bit unsigned integer.
+INT32 | 7 | 32 bit signed integer.
+FLOAT32 | 8 | 32 bit floating point.
+FLOAT64 | 9 | 64 bit double precision floating point.
+Complex Types |-|-
+STRING | 10 | String.
+ARRAY | 11 | Array. Used like `[Tbjson.TYPES.ARRAY, <TYPE>]`. Example: `x: [Tbjson.TYPES.ARRAY, MyClass]`.
+OBJECT | 12 | Object. Used like `Tbjson.TYPES.OBJECT` or `[Tbjson.TYPES.OBJECT, <TYPE>]` if all the values in the object are the same type. Example: `x: [Tbjson.TYPES.OBJECT, MyClass]`.
+NULLABLE | 13 | Nullable value,  Used like `[Tbjson.TYPES.NULLABLE, <TYPE>]`. Example: `x: [Tbjson.TYPES.NULLABLE, Tbjson.TYPES.STRING]`.
+TYPED_ARRAY | 14 | Typed array like Float32Array or Int16Array. Used like `[Tbjson.TYPES.TYPED_ARRAY, <TYPE>`. Example: `x: [Tbjson.TYPES.TYPED_ARRAY, Tbjson.TYPES.INT32]`.
+UNKNOWN | 15 | Unknown type. Wildcard that can represent a JS number, boolean, or string.
 
 ### Reference
 ```js
@@ -48,7 +72,7 @@ const Tbjson = require('typed-binary-json');
 
 let tbjson = new Tbjson();
 
-let serializedToBuffer = tbjson.serializeToBuffer({ a: "a", b: 1, c: true }); // serialize the object
+let serializedToBuffer = tbjson.serializeToBuffer({ a: 'a', b: 1, c: true }); // serialize the object
 tbjson.parseBuffer(serializedToBuffer); // parse the buffer
 
 // use these to register classes and types
@@ -78,7 +102,7 @@ A.tbjson = {
 
 class B {
 	as = [new A()];
-	string = "string";
+	string = 'string';
 	bool = false;
 	number = 100.5;
 }
@@ -144,10 +168,18 @@ Create a read stream for `filename` and parse its contents. Useful for very larg
 #### registerPrototype(obj)
 Register a prototype. `obj` is the definition for the prototype.
 
+#### registerPrototypeRecur(obj)
+Register a prototype and then walk it's definition and register those prototypes. `obj` is the definition for the prototype.
+
 ### Types
 
 #### registerType(obj)
 Register a custom type (a primitive, like int48, etc...). `obj` is the definition for the custom type.
+
+### Static
+
+#### cast(obj, prototype)
+Cast the given obj as the prototype.
 
 ## Performance
 Performance varies on the data type, but you'll get best performance if your types have lots of numeric values, and even better performance if you can take advantage of `float32`, `int32`, `int16`, and `int8` to save space.  
