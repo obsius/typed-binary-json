@@ -1011,18 +1011,29 @@ export default class Tbjson {
 
 		// fixed-length array
 		} else if (Array.isArray(def)) {
+
 			let objs = [];
+
 			for (let i = 0; i < def.length; ++i) {
 				objs.push(this.parse(def[i]));
 			}
+
 			return objs;
 
 		// object
 		} else {
+
 			let obj = prototype ? new prototype() : {};
+
 			for (let key in def) {
 				obj[key] = this.parse(def[key]);
 			}
+
+			// call the build function for post construction
+			if (prototype.tbjson && prototype.tbjson.build) {
+				prototype.tbjson.build(obj);
+			}
+
 			return obj;
 		}
 	}
@@ -1086,17 +1097,22 @@ Tbjson.cast = (obj, prototype = {}, definitions = {}) => {
 				definition = prototype.tbjson.definition;
 
 				for (let parent = prototype; parent = getParent(parent);) {
-					if (!parent.tbjson || !parent.tbjson.definition) { return; }
+					if (!parent.tbjson || !parent.tbjson.definition) { break; }
 					definition = Object.assign({}, parent.tbjson.definition, definition);
 				}
 
 				definitions[prototype.name] = definition;
 			}
 
-			let typedObj = prototype ? new prototype() : {};
+			let typedObj = new prototype();
 
 			for (let key in obj) {
 				typedObj[key] = Tbjson.cast(obj[key], definition[key], definitions);
+			}
+
+			// call the build function for post construction
+			if (prototype.tbjson.build) {
+				prototype.tbjson.build(typedObj);
 			}
 
 			return typedObj;
