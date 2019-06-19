@@ -55,13 +55,17 @@ export default function(Tbjson, stringify, validateTypes) {
 				'1': new A()
 			}
 		};
+		nullableAndNullA = null;
+		nullableAndNotA = new A();
 	}
 	B.tbjson = {
 		definition: {
 			array: [Tbjson.TYPES.ARRAY, A],
 			array2: [Tbjson.TYPES.ARRAY, [Tbjson.TYPES.ARRAY, A]],
 			object: [Tbjson.TYPES.OBJECT, A],
-			object2: [Tbjson.TYPES.OBJECT, [Tbjson.TYPES.OBJECT, A]]
+			object2: [Tbjson.TYPES.OBJECT, [Tbjson.TYPES.OBJECT, A]],
+			nullableAndNullA: [Tbjson.TYPES.NULLABLE, A],
+			nullableAndNotA: [Tbjson.TYPES.NULLABLE, A]
 		}
 	};
 
@@ -103,6 +107,9 @@ export default function(Tbjson, stringify, validateTypes) {
 	let x = new E();
 
 	let typedX = Tbjson.cast(JSON.parse(stringify(x)), E);
+
+	console.log(x);
+	console.log(typedX);
 
 	let invalid = validateTypes(x, typedX);
 	if (invalid) { return invalid; }

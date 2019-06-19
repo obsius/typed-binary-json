@@ -27,7 +27,8 @@ import {
 	TYPED_ARRAY_OFFSET,
 	TYPE_OFFSET,
 	PROTOTYPE_OFFSET,
-	ARRAY_OFFSET
+	ARRAY_OFFSET,
+	NULLABLE_PROTOTYPE_OFFSET
 } from './constants';
 
 import Type from './Type';
@@ -657,9 +658,19 @@ export default class Tbjson {
 						if (def[0] == ARRAY) {
 							return ARRAY_OFFSET + this.fmtDef(def[1]);
 
-						// nullable primitive
+						// nullable
 						} else if (def[0] == NULLABLE) {
-							return NULLABLE_OFFSET + this.fmtDef(def[1]);
+
+							let subDef = this.fmtDef(def[1]);
+
+							// primitive
+							if (subDef < NULLABLE_OFFSET) {
+								return NULLABLE_OFFSET + subDef;
+
+							// prototype
+							} else {
+								return NULLABLE_PROTOTYPE_OFFSET + subDef;
+							}
 
 						// primitive typed array
 						} else if (def[0] == TYPED_ARRAY) {
@@ -757,6 +768,25 @@ export default class Tbjson {
 			// known prototype
 			} else if (def < ARRAY_OFFSET) {
 
+				let valid = obj != null && typeof obj == 'object';
+
+				// validate the object
+				if (def < NULLABLE_PROTOTYPE_OFFSET) {
+					if (!valid) {
+						throw new Error('Null objects cannot be passed into known prototypes, mark as a nullable known prototype instead.');
+					}
+
+				// null values allowed, mark it as null or not
+				} else {
+					if (valid) {
+						def -= NULLABLE_PROTOTYPE_OFFSET;
+						this.writer.write(BOOL, true);
+					} else {
+						this.writer.write(NULL);
+						return;
+					}
+				}
+			
 				// register the prototype if needed
 				if (obj.constructor.tbjson) {
 					this.registerPrototype(obj.constructor);
@@ -994,6 +1024,18 @@ export default class Tbjson {
 
 			// known prototype
 			} else if (def < ARRAY_OFFSET) {
+
+				// nullable
+				if (def >= NULLABLE_PROTOTYPE_OFFSET) {
+
+					// null
+					if (!this.reader.read(UINT8)) {
+						return null;
+					}
+
+					def -= NULLABLE_PROTOTYPE_OFFSET;
+				}
+
 				let proto = this.protos[def];
 				return this.parse(proto.definition ? proto.definition : this.objs[this.reader.read(UINT16)], proto.prototype);
 
@@ -1030,7 +1072,7 @@ export default class Tbjson {
 			}
 
 			// call the build function for post construction
-			if (prototype.tbjson && prototype.tbjson.build) {
+			if (prototype && prototype.tbjson && prototype.tbjson.build) {
 				prototype.tbjson.build(obj);
 			}
 
@@ -1062,6 +1104,7 @@ Tbjson.cast = (obj, prototype = {}, definitions = {}) => {
 				for (let i = 0; i < obj.length; ++i) {
 					typedObj.push(Tbjson.cast(obj[i], prototype[1], definitions));
 				}
+				
 			// unknown array
 			} else {
 				for (let i = 0; i < obj.length; ++i) {

@@ -1,7 +1,19 @@
 export default function(Tbjson, stringify) {
 
+	class A {
+		str = 'hello';
+		number = 100;
+	}
+
+	A.tbjson = {
+		definition: {
+			str: Tbjson.TYPES.STRING,
+			number: Tbjson.TYPES.FLOAT32
+		}
+	};
+
 	let tbjson = new Tbjson([], [{
-		reference: 'A',
+		reference: 'B',
 		definition: {
 			bool: [Tbjson.TYPES.NULLABLE, Tbjson.TYPES.BOOL],
 			uint8: [Tbjson.TYPES.NULLABLE, Tbjson.TYPES.UINT8],
@@ -17,11 +29,13 @@ export default function(Tbjson, stringify) {
 				[Tbjson.TYPES.NULLABLE, Tbjson.TYPES.BOOL],
 				[Tbjson.TYPES.NULLABLE, Tbjson.TYPES.INT32],
 				[Tbjson.TYPES.NULLABLE, Tbjson.TYPES.FLOAT64]
-			]
+			],
+			a: [Tbjson.TYPES.NULLABLE, A],
+			aa: [Tbjson.TYPES.NULLABLE, A]
 		}
 	}]);
 
-	class A {
+	class B {
 		bool = null;
 		uint8 = null;
 		int8 = null;
@@ -33,9 +47,11 @@ export default function(Tbjson, stringify) {
 		float64 = null;
 		string = null;
 		array = [true, 3200000, 9999.123456789];
+		a = null;
+		aa = new A();
 	}
 
-	let x = new A();
+	let x = new B();
 
 	return [
 		stringify(x),
