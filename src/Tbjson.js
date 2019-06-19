@@ -188,7 +188,7 @@ export default class Tbjson {
 
 			if (!prototype.tbjson) { return; }
 
-			this.registerPrototype(prototype);
+			this.registerPrototype(prototype.tbjson);
 
 			prototype = prototype.tbjson.definition;
 		}
