@@ -773,7 +773,7 @@ export default class Tbjson {
 				// validate the object
 				if (def < NULLABLE_PROTOTYPE_OFFSET) {
 					if (!valid) {
-						throw new Error('Null objects cannot be passed into known prototypes, mark as a nullable known prototype instead.');
+						throw new Error(`Null objects cannot be passed into known prototypes, mark as a nullable known prototype instead: ${this.protos[def] ? this.protos[def].prototype : def}`);
 					}
 
 				// null values allowed, mark it as null or not
