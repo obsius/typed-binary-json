@@ -108,9 +108,6 @@ export default function(Tbjson, stringify, validateTypes) {
 
 	let typedX = Tbjson.cast(JSON.parse(stringify(x)), E);
 
-	console.log(x);
-	console.log(typedX);
-
 	let invalid = validateTypes(x, typedX);
 	if (invalid) { return invalid; }
 

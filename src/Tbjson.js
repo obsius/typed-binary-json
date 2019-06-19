@@ -1084,7 +1084,7 @@ export default class Tbjson {
 Tbjson.TYPES = { NULL, BOOL, INT8, UINT8, INT16, UINT16, INT32, UINT32, FLOAT32, FLOAT64, STRING, ARRAY, OBJECT, NULLABLE, TYPED_ARRAY, UNKNOWN };
 
 /**
- * Cast a plain object into the typed object it represents.
+ * Cast a plain object into the typed object it represents. Only supports prototype definitions, not strings.
  * 
  * @param {string} obj - object to parse
  * @param {function} obj - prototype to cast into
@@ -1094,13 +1094,15 @@ Tbjson.cast = (obj, prototype = {}, definitions = {}) => {
 	// object or array with a definition
 	if (typeof obj == 'object') {
 
+		let isArrayTypeDef = Array.isArray(prototype) && prototype.length == 2;
+
 		// array
 		if (Array.isArray(obj)) {
 
 			let typedObj = [];
 
 			// typed array
-			if (Array.isArray(prototype) && prototype.length == 2 && prototype[0] == ARRAY) {
+			if (isArrayTypeDef && prototype[0] == ARRAY) {
 				for (let i = 0; i < obj.length; ++i) {
 					typedObj.push(Tbjson.cast(obj[i], prototype[1], definitions));
 				}
@@ -1115,7 +1117,7 @@ Tbjson.cast = (obj, prototype = {}, definitions = {}) => {
 			return typedObj;
 
 		// uniform value object
-		} else if (Array.isArray(prototype) && prototype.length == 2 && prototype[0] == OBJECT) {
+		} else if (isArrayTypeDef && prototype[0] == OBJECT) {
 
 			let typedObj = {};
 
@@ -1124,6 +1126,10 @@ Tbjson.cast = (obj, prototype = {}, definitions = {}) => {
 			}
 
 			return typedObj;
+
+		// nullable object
+		} else if (isArrayTypeDef && prototype[0] == NULLABLE) {
+			return obj == null ? null : Tbjson.cast(obj, prototype[1], definitions);
 
 		// object
 		} else if (prototype.tbjson && prototype.tbjson.definition) {
@@ -1162,7 +1168,7 @@ Tbjson.cast = (obj, prototype = {}, definitions = {}) => {
 		}
 	}
 
-	// primitive
+	// primitive or untyped
 	return obj;
 }
 
