@@ -120,7 +120,13 @@ export default class Tbjson {
 	 */
 	registerPrototype(prototype) {
 
-		if (this.finalized) { return; }
+		if (this.finalized) {
+			if (typeof prototype == 'function' && prototype.tbjson) {
+				return this.protoRefs[prototype.name];
+			}
+
+			return;
+		}
 
 		// a prototype
 		if (typeof prototype == 'function') {
@@ -142,7 +148,7 @@ export default class Tbjson {
 			}
 		}
 
-		// if the ref is not set, use the constructor's name
+		// if the ref is not set, use the name
 		if (!prototype.reference) {
 			prototype.reference = prototype.prototype.name;
 		}
@@ -184,27 +190,24 @@ export default class Tbjson {
 	 */
 	registerPrototypeRecur(prototype) {
 
-		if (typeof prototype == 'function') {
-
-			if (!prototype.tbjson) { return; }
-
-			this.registerPrototype(prototype.tbjson);
-
-			prototype = prototype.tbjson.definition;
+		if (typeof prototype != 'function' ||
+			!prototype.tbjson || !prototype.tbjson.definition ||
+			this.protoRefs[prototype.name]) { 
+			
+			return;
 		}
 
-		if (prototype != null && typeof prototype == 'object') {
-			if (Array.isArray(prototype)) {
-				for (let i = 0; i < prototype.length; ++i) {
-					this.registerPrototypeRecur(prototype[i]);
-				}
-			} else {
-				for (let key in prototype) {
-					this.registerPrototypeRecur(prototype[key]);
-				}
+		this.registerPrototype(prototype);
+
+		for (let key in prototype.definition) {
+
+			let refPrototypes = getPrototypesFromDefinition(prototype.definition[key]);
+
+			for (let ref of refPrototypes) {
+				this.registerPrototypeRecur(ref);
 			}
 		}
-	};
+	}
 
 	/**
 	 * Register an array of prototypes.
@@ -894,7 +897,7 @@ export default class Tbjson {
 				// object or known prototype
 				} else {
 
-					// the object is prototype
+					// the object is a prototype
 					if (obj.constructor) {
 
 						// a known tbjson prototype
@@ -903,10 +906,16 @@ export default class Tbjson {
 							// add this object type to the known prototypes
 							let code = this.registerPrototype(obj.constructor);
 
-							// process the prototype definition
-							this.serializeDef(obj, this.protos[code].definition);
+							if (code != null) {
 
-							return code;
+								// process the prototype definition
+								this.serializeDef(obj, this.protos[code].definition);
+
+								return code;
+							} else {
+								// REMOVE
+								console.log('warning: ', code, obj);
+							}
 
 						// might be a known tbjson prototype
 						} else {
@@ -1182,4 +1191,22 @@ Tbjson.cast = (obj, prototype = {}, definitions = {}) => {
 function getParent(prototype) {
 	let parent = prototype ? Object.getPrototypeOf(prototype) : null;
 	return (parent && parent.name) ? parent : null;
+}
+
+/**
+ * Returns a list of prototypes used in a definition.
+ * 
+ * @param {obj} obj - object to check
+ */
+function getPrototypesFromDefinition(obj) {
+
+	let protos = [];
+
+	if (Array.isArray(arr) && arr.length == 2) {
+		protos = protos.concat(getPrototypesFromDefinition(arr[1]));
+	} else if (typeof obj == 'function') {
+		protos.push(obj);
+	}
+		
+	return protos;
 }
