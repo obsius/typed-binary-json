@@ -43,6 +43,8 @@ const DEFAULT_STR_ENCODING = 'utf-8';
 const DEFAULT_NUM_ENCODING = FLOAT64;
 const DEFAULT_BUFFER_SIZE = 1048576;
 
+const ERROR = -1;
+
 /**
  * Tbjson
  * 
@@ -186,8 +188,14 @@ export default class Tbjson {
 				parentCode = parent ? this.registerPrototype(parent) : null;
 			}
 
+			// format the definition
+			let definition = prototype.definition ? this.fmtDef(prototype.definition) : null;
+			if (definition == ERROR) {
+				throw new Error(`Invalid definition for: ${prototype.prototype.name}`);
+			}
+
 			// set the prototype
-			this.protos[code] = new Prototype(this.fmtDef(prototype.definition), prototype.prototype, parentCode, prototype.noInherit);
+			this.protos[code] = new Prototype(definition, prototype.prototype, parentCode, prototype.noInherit);
 		}
 		
 		return code;
@@ -734,12 +742,9 @@ export default class Tbjson {
 			// object or array
 			case 'object':
 
-				// invalid
-				if (def == null) { break; }
-
-				// null
+				// invalid null
 				if (!def) {
-					return null;
+					break;
 
 				// array
 				} else if (Array.isArray(def)) {
@@ -802,7 +807,7 @@ export default class Tbjson {
 		}
 
 		// must have an invalid definition
-		throw new Error('Invalid definition found, check to make sure that all references to "Tbjson.TYPES.?" are spelled properly');
+		return ERROR;
 	}
 
 	/**
