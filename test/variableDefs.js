@@ -23,13 +23,15 @@ export default function(Tbjson, stringify) {
 	tbjson.registerVariableDef('var1', {
 		int: Tbjson.TYPES.INT32,
 		string: Tbjson.TYPES.STRING,
-		array: Tbjson.TYPES.OBJECT,
+		array: Tbjson.TYPES.ARRAY,
 		object: Tbjson.TYPES.OBJECT
 	});
 
 	tbjson.processVariableDefs();
 
-	console.log(tbjson.protos);
+//	tbjson.serializeToBuffer(x);
+
+	console.log(tbjson);
 
 	return [
 		stringify(x),
