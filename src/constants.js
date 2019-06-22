@@ -22,6 +22,9 @@ export const NULLABLE =           			13;
 export const TYPED_ARRAY =        			14;
 export const UNKNOWN =            			15;
 
+// extras
+export const VARIABLE_DEF =					16;
+
 // primitive sizes			
 export const SIZE_NULL =          			1;
 export const SIZE_BOOL =          			1;

@@ -13,6 +13,7 @@ import selection from './selection';
 import typedArray from './typedArray';
 import typedSelection from './typedSelection';
 import strings from './strings';
+import variableDefs from './variableDefs';
 
 function stringify(val) {
 	return JSON.stringify(val, (name, val) => {
@@ -64,6 +65,7 @@ function run() {
 	runTest('Typed Array', typedArray);
 	runTest('Typed Selection', typedSelection);
 	runTest('Strings', strings);
+	runTest('Variable Definitions', variableDefs);
 }
 
 function runTest(name, fn) {

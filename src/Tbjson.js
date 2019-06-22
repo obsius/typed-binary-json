@@ -20,6 +20,7 @@ import {
 	NULLABLE,
 	TYPED_ARRAY,
 	UNKNOWN,
+	VARIABLE_DEF,
 
 	SIZE_UINT32,
 	
@@ -27,8 +28,8 @@ import {
 	TYPED_ARRAY_OFFSET,
 	TYPE_OFFSET,
 	PROTOTYPE_OFFSET,
-	ARRAY_OFFSET,
-	NULLABLE_PROTOTYPE_OFFSET
+	NULLABLE_PROTOTYPE_OFFSET,
+	ARRAY_OFFSET
 } from './constants';
 
 import Type from './Type';
@@ -60,6 +61,9 @@ export default class Tbjson {
 	// for plain objects that are inside of known prototypers
 	objs = {};
 
+	// for variable definitions
+	variableDefs = {};
+
 	// binary definition tree
 	root = null;
 
@@ -90,6 +94,16 @@ export default class Tbjson {
 
 	/*-----------------------------------------------------------------------*/
 	/* registers */
+
+	/**
+	 * Register a variable definition so that any prototypes with the same variable definition id are replaced before serializing.
+	 * 
+	 * @param { number | string } id - the identifier of this variable definition
+	 * @param {obj} def - the definition to set to
+	 */
+	registerVariableDef(id, def) {
+		this.variableDefs[id] = def;
+	}
 
 	/**
 	 * Register a prototype / class or plain objecct for serilization and deserialization.
@@ -327,6 +341,8 @@ export default class Tbjson {
 	serializeToBuffer(obj) {
 		try {
 
+			this.processVariableDefs();
+
 			// make a writer
 			this.writer = new BufferWriter(this.options.bufferSize);
 
@@ -350,6 +366,8 @@ export default class Tbjson {
 	 */
 	serializeToStream(stream, obj) {
 		try {
+
+			this.processVariableDefs();
 
 			// make a writer
 			this.writer = new StreamBufferWriter(stream, this.options.bufferSize);
@@ -375,6 +393,8 @@ export default class Tbjson {
 	serializeToFile(filename, obj) {
 		return new Promise((res, rej) => {
 			try {
+
+				this.processVariableDefs();
 
 				let tempFilename = `${filename}.tmp`;
 
@@ -619,6 +639,71 @@ export default class Tbjson {
 	/* private */
 
 	/**
+	 * Process all prototype definitions and variable definitions.
+	 */
+	processVariableDefs() {
+		for (let code in this.protos) {
+			if (this.protos[code].definition) {
+				this.protos[code].definition = this.replaceVariableDefs(this.protos[code].definition);
+			}
+		}
+	}
+
+	/**
+	 * Replace a variable definition with the corresponding registered one.
+	 * 
+	 * @param {obj} def - the definition to check and replace 
+	 */
+	replaceVariableDefs(def) {
+		if (typeof def == 'object') {
+
+			// an array, could be a variable definition
+			if (Array.isArray(def)) {
+
+				if (def.length == 2) {
+
+					switch (def[0]) {
+
+						// a variable def
+						case VARIABLE_DEF:
+
+							// missing a definition, throw an error
+							if (!this.variableDefs[def[1]]) {
+								throw new Error(`Unknown variable def: "${def[1]}"`);
+							}
+
+							return this.variableDefs[def[1]];
+
+						// another valid tbjson qualifier
+						case ARRAY:
+						case TYPED_ARRAY:
+						case NULLABLE:
+						case OBJECT:
+							
+							def[1] = this.replaceVariableDefs(def[1]);
+							
+							return def;
+					}
+				}
+
+				// a fixed-length array
+				for (let i = 0; i < def.length; ++i) {
+					def[i] = this.replaceVariableDefs(def[i]);
+				}
+
+			// a definition
+			} else {
+
+				for (let key in def) {
+					def[key] = this.replaceVariableDefs(def[key]);
+				}
+			}
+		}
+
+		return def;
+	}
+
+	/**
 	 * Format the definition to its number representations.
 	 * 
 	 * Converts the more verbose array definitions to simpler numeric ones:
@@ -648,6 +733,9 @@ export default class Tbjson {
 
 			// object or array
 			case 'object':
+
+				// invalid
+				if (def == null) { break; }
 
 				// null
 				if (!def) {
@@ -682,6 +770,10 @@ export default class Tbjson {
 						// object
 						} else if (def[0] == OBJECT) {
 							return this.fmtDef(def[0]);
+
+						// variable
+						} else if (def[0] == VARIABLE_DEF) {
+							return def;
 						}
 					}
 
@@ -708,6 +800,9 @@ export default class Tbjson {
 			case 'boolean':
 				break;
 		}
+
+		// must have an invalid definition
+		throw new Error('Invalid definition found, check to make sure that all references to "Tbjson.TYPES.?" are spelled properly');
 	}
 
 	/**
@@ -715,8 +810,9 @@ export default class Tbjson {
 	 * 
 	 * @param { object } obj - the object to serialize
 	 * @param { object | array | number } def - the definition specifying how to decode the binary data
+	 * @param { bool } isArray - special case for an unknown def that is an array
 	 */
-	serializeDef(obj, def) {
+	serializeDef(obj, def, isArray) {
 
 		// no def, could be a known but undefined prototype, or a plain object, kick back to the serializer
 		if (!def) {
@@ -725,103 +821,131 @@ export default class Tbjson {
 			let code = this.nextObjCode++;
 			this.writer.write(UINT16, code);
 
+			let ref;
+
+			// write the array
+			if (isArray) {
+
+				ref = [];
+				for (let i = 0; i < obj.length; ++i) {
+					ref[i] = this.serialize(obj[i]);
+				}
+				
 			// write the obj
-			let ref = {};
-			for (let key in obj) {
-				ref[key] = this.serialize(obj[key]);
+			} else {
+
+				ref = {};
+				for (let key in obj) {
+					ref[key] = this.serialize(obj[key]);
+				}
 			}
+
 			this.objs[code] = ref;
 
 			return;
 		}
 
-		// typed
-		if (typeof def == 'number') {
+		switch (typeof def) {
 
-			// primitive
-			if (def < NULLABLE_OFFSET) {
-
-				// an unknown object
-				if (def == OBJECT) {
-					this.serializeDef(obj);
+			// typed
+			case 'number':
 
 				// primitive
-				} else {
-					this.writer.write(def, obj);
-				}
+				if (def < NULLABLE_OFFSET) {
 
-			// nullable primitive
-			} else if (def < TYPED_ARRAY_OFFSET) {
-				if (obj == null) {
-					this.writer.write(UINT8, 0);
-				} else {
-					this.writer.write(UINT8, 1);
-					this.writer.write(def - NULLABLE_OFFSET, obj);
-				}
+					// an unknown object
+					if (def == OBJECT) {
+						this.serializeDef(obj);
 
-			// primitive typed array
-			} else if (def < TYPE_OFFSET) {
-				this.writer.write(UINT32, obj.buffer.byteLength);
-				this.writer.writeBuffer(Buffer.from(obj.buffer));
+					// an unknown array
+					} else if (def == ARRAY) {
+						this.serializeDef(obj, null, true);
 
-			// custom type
-			} else if (def < PROTOTYPE_OFFSET) {
-				//TODO
-
-			// known prototype
-			} else if (def < ARRAY_OFFSET) {
-
-				let valid = obj != null && typeof obj == 'object';
-
-				// validate the object
-				if (def < NULLABLE_PROTOTYPE_OFFSET) {
-					if (!valid) {
-						throw new Error(`Null objects cannot be passed into known prototypes, mark as a nullable known prototype instead: ${this.protos[def] ? this.protos[def].prototype : def}`);
-					}
-
-				// null values allowed, mark it as null or not
-				} else {
-					if (valid) {
-						def -= NULLABLE_PROTOTYPE_OFFSET;
-						this.writer.write(BOOL, true);
+					// primitive
 					} else {
-						this.writer.write(NULL);
-						return;
+						this.writer.write(def, obj);
+					}
+
+				// nullable primitive
+				} else if (def < TYPED_ARRAY_OFFSET) {
+					if (obj == null) {
+						this.writer.write(UINT8, 0);
+					} else {
+						this.writer.write(UINT8, 1);
+						this.writer.write(def - NULLABLE_OFFSET, obj);
+					}
+
+				// primitive typed array
+				} else if (def < TYPE_OFFSET) {
+					this.writer.write(UINT32, obj.buffer.byteLength);
+					this.writer.writeBuffer(Buffer.from(obj.buffer));
+
+				// custom type
+				} else if (def < PROTOTYPE_OFFSET) {
+					//TODO
+
+				// known prototype
+				} else if (def < ARRAY_OFFSET) {
+
+					let valid = obj != null && typeof obj == 'object';
+
+					// validate the object
+					if (def < NULLABLE_PROTOTYPE_OFFSET) {
+						if (!valid) {
+							throw new Error(`Null objects cannot be passed into known prototypes, mark as a nullable known prototype instead: ${this.protos[def] ? this.protos[def].prototype : def}`);
+						}
+
+					// null values allowed, mark it as null or not
+					} else {
+						if (valid) {
+							def -= NULLABLE_PROTOTYPE_OFFSET;
+							this.writer.write(BOOL, true);
+						} else {
+							this.writer.write(NULL);
+							return;
+						}
+					}
+				
+					// register the prototype if needed
+					if (obj.constructor.tbjson) {
+						this.registerPrototype(obj.constructor);
+					}
+
+					this.serializeDef(obj, this.protos[def].definition);
+
+				//variable-length fixed typed array 
+				} else {
+					// write out the length
+					this.writer.write(UINT32, obj.length);
+
+					for (let i = 0; i < obj.length; ++i) {
+						this.serializeDef(obj[i], def - ARRAY_OFFSET);
 					}
 				}
+
+				break;
 			
-				// register the prototype if needed
-				if (obj.constructor.tbjson) {
-					this.registerPrototype(obj.constructor);
+			// oject or array
+			case 'object':
+
+				// fixed-length variable type array
+				if (Array.isArray(def)) {
+					for (let i = 0; i < def.length; ++i) {
+						this.serializeDef(obj[i], def[i]);
+					}
+
+				// object
+				} else {
+					for (let key in def) {
+						this.serializeDef(obj[key], def[key]);
+					}
 				}
 
-				this.serializeDef(obj, this.protos[def].definition);
+				break;
 
-			//variable-length fixed typed array 
-			} else {
-				// write out the length
-				this.writer.write(UINT32, obj.length);
-
-				for (let i = 0; i < obj.length; ++i) {
-					this.serializeDef(obj[i], def - ARRAY_OFFSET);
-				}
-			}
-			
-		// oject or array
-		} else {
-
-			// fixed-length variable type array
-			if (Array.isArray(def)) {
-				for (let i = 0; i < def.length; ++i) {
-					this.serializeDef(obj[i], def[i]);
-				}
-
-			// object
-			} else {
-				for (let key in def) {
-					this.serializeDef(obj[key], def[key]);
-				}
-			}
+			// invalid
+			default:
+				throw new Error(`Invalid definition: ${def}`);
 		}
 	}
 
@@ -1090,7 +1214,7 @@ export default class Tbjson {
 	}
 }
 
-Tbjson.TYPES = { NULL, BOOL, INT8, UINT8, INT16, UINT16, INT32, UINT32, FLOAT32, FLOAT64, STRING, ARRAY, OBJECT, NULLABLE, TYPED_ARRAY, UNKNOWN };
+Tbjson.TYPES = { NULL, BOOL, INT8, UINT8, INT16, UINT16, INT32, UINT32, FLOAT32, FLOAT64, STRING, ARRAY, OBJECT, NULLABLE, TYPED_ARRAY, UNKNOWN, VARIABLE_DEF };
 
 /**
  * Cast a plain object into the typed object it represents. Only supports prototype definitions, not strings.
