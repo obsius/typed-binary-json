@@ -1127,8 +1127,8 @@ export default class Tbjson {
 				if (def == NULL) {
 					return null;
 
-				// unknown object
-				} else if (def == OBJECT) {
+				// unknown object or array
+				} else if (def == OBJECT || def == ARRAY) {
 					return this.parse(this.objs[this.reader.read(UINT16)]);
 
 				// primitive
@@ -1170,6 +1170,7 @@ export default class Tbjson {
 				}
 
 				let proto = this.protos[def];
+
 				return this.parse(proto.definition ? proto.definition : this.objs[this.reader.read(UINT16)], proto.prototype);
 
 			// variable-length fixed typed array 
@@ -1181,6 +1182,7 @@ export default class Tbjson {
 				for (let i = 0; i < length; ++i) {
 					objs.push(this.parse(def - ARRAY_OFFSET));
 				}
+
 				return objs;
 			}
 

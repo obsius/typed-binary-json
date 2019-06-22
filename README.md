@@ -59,7 +59,7 @@ FLOAT32 | 8 | 32 bit floating point.
 FLOAT64 | 9 | 64 bit double precision floating point.
 Complex Types |-|-
 STRING | 10 | String.
-ARRAY | 11 | Array. Used like `[Tbjson.TYPES.ARRAY, <TYPE>]`. Example: `x: [Tbjson.TYPES.ARRAY, MyClass]`.
+ARRAY | 11 | Array. Used like `Tbjson.TYPES.ARRAY` or `[Tbjson.TYPES.ARRAY, <TYPE>]`. Example: `x: [Tbjson.TYPES.ARRAY, MyClass]`.
 OBJECT | 12 | Object. Used like `Tbjson.TYPES.OBJECT` or `[Tbjson.TYPES.OBJECT, <TYPE>]` if all the values in the object are the same type. Example: `x: [Tbjson.TYPES.OBJECT, MyClass]`.
 NULLABLE | 13 | Nullable value,  Used like `[Tbjson.TYPES.NULLABLE, <TYPE>]`. Example: `x: [Tbjson.TYPES.NULLABLE, Tbjson.TYPES.STRING]`.
 TYPED_ARRAY | 14 | Typed array like Float32Array or Int16Array. Used like `[Tbjson.TYPES.TYPED_ARRAY, <TYPE>`. Example: `x: [Tbjson.TYPES.TYPED_ARRAY, Tbjson.TYPES.INT32]`.

@@ -29,10 +29,6 @@ export default function(Tbjson, stringify) {
 
 	tbjson.processVariableDefs();
 
-//	tbjson.serializeToBuffer(x);
-
-	console.log(tbjson);
-
 	return [
 		stringify(x),
 		stringify(tbjson.parseBuffer(tbjson.serializeToBuffer(x)))
