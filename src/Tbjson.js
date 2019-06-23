@@ -1229,7 +1229,7 @@ Tbjson.TYPES = { NULL, BOOL, INT8, UINT8, INT16, UINT16, INT32, UINT32, FLOAT32,
  * @param {string} obj - object to parse
  * @param {function} obj - prototype to cast into
  */
-Tbjson.cast = (obj, prototype = {}, definitions = {}) => {
+Tbjson.cast = (obj, prototype, definitions = {}) => {
 
 	// object or array with a definition
 	if (typeof obj == 'object') {
@@ -1272,37 +1272,46 @@ Tbjson.cast = (obj, prototype = {}, definitions = {}) => {
 			return obj == null ? null : Tbjson.cast(obj, prototype[1], definitions);
 
 		// object
-		} else if (prototype.tbjson && prototype.tbjson.definition) {
+		} else if (prototype) {
 
+			let typedObj;
 			let definition;
+			let build;
 
-			// use map
-			if (definitions[prototype.name]) {
-				definition = definitions[prototype.name];
+			if (prototype.tbjson && prototype.tbjson.definition) {
 
-			// check for parent
+				typedObj = new prototype();
+				build = prototype.tbjson.build;
+
+				// use map
+				if (definitions[prototype.name]) {
+					definition = definitions[prototype.name];
+
+				// check for parent
+				} else {
+
+					definition = prototype.tbjson.definition;
+
+					for (let parent = prototype; parent = getParent(parent);) {
+						if (!parent.tbjson || !parent.tbjson.definition) { break; }
+						definition = Object.assign({}, parent.tbjson.definition, definition);
+					}
+
+					definitions[prototype.name] = definition;
+				}
+				
 			} else {
 
-				definition = prototype.tbjson.definition;
-
-				for (let parent = prototype; parent = getParent(parent);) {
-					if (!parent.tbjson || !parent.tbjson.definition) { break; }
-					definition = Object.assign({}, parent.tbjson.definition, definition);
-				}
-
-				definitions[prototype.name] = definition;
+				typedObj = {};
+				definition = prototype;
 			}
-
-			let typedObj = new prototype();
 
 			for (let key in obj) {
 				typedObj[key] = Tbjson.cast(obj[key], definition[key], definitions);
 			}
 
 			// call the build function for post construction
-			if (prototype.tbjson.build) {
-				prototype.tbjson.build(typedObj);
-			}
+			if (build) { build(typedObj); }
 
 			return typedObj;
 		}

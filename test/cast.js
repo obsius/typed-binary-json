@@ -85,13 +85,23 @@ export default function(Tbjson, stringify, validateTypes) {
 		b = new B();
 		c = new C();
 		mixed = [new A(), new B(), new C()];
+		nested = {
+			a: new A(),
+			b: new B(),
+			c: new C()
+		};
 	}
 	D.tbjson = {
 		definition: {
 			a: A,
 			b: B,
 			c: C,
-			mixed: [A, B, C]
+			mixed: [A, B, C],
+			nested: {
+				a: A,
+				b: B,
+				c: C
+			}
 		}
 	};
 
