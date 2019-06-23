@@ -1234,10 +1234,11 @@ Tbjson.cast = (obj, prototype, definitions = {}) => {
 	// object or array with a definition
 	if (typeof obj == 'object') {
 
-		let isArrayTypeDef = Array.isArray(prototype) && prototype.length == 2;
+		let isArray = Array.isArray(prototype);
+		let isArrayTypeDef = isArray && prototype.length == 2;
 
 		// array
-		if (Array.isArray(obj)) {
+		if (Array.isArray(obj) && isArray) {
 
 			let typedObj = [];
 
@@ -1299,7 +1300,7 @@ Tbjson.cast = (obj, prototype, definitions = {}) => {
 
 					definitions[prototype.name] = definition;
 				}
-				
+
 			} else {
 
 				typedObj = {};
