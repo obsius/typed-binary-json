@@ -1,6 +1,6 @@
 {
 	"name": "typed-binary-json",
-	"version": "1.10.6",
+	"version": "1.10.13",
 	"description": "A TBJSON parser and serializer.",
 	"author": "Jeff Seaman",
 	"contributors": [
@@ -36,7 +36,7 @@
 		"@babel/preset-env": "^7.4.5",
 		"nodemon": "^1.19.1",
 		"rollup": "^1.15.6",
-		"rollup-plugin-babel": "^4.3.2"
+		"rollup-plugin-babel": "^4.3.3"
 	},
 	"repository": {
 		"type": "git",

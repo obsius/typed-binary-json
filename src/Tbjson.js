@@ -29,7 +29,9 @@ import {
 	TYPE_OFFSET,
 	PROTOTYPE_OFFSET,
 	NULLABLE_PROTOTYPE_OFFSET,
-	ARRAY_OFFSET
+	ARRAY_OFFSET,
+	OBJECT_OFFSET
+
 } from './constants';
 
 import Type from './Type';
@@ -202,36 +204,6 @@ export default class Tbjson {
 	}
 
 	/**
-	 * Register a prototype (constructor only) recursively, automatically adding all classes that it references.
-	 * 
-	 * Example:
-	 *
-	 * Tbjson.registerPrototypeRecur(Point); // point must have tbjson set on it: Point.tbjson = { definition: ... } 
-	 * 
-	 * @param {function} prototype - prototype constructor
-	 */
-	registerPrototypeRecur(prototype) {
-
-		if (typeof prototype != 'function' ||
-			!prototype.tbjson || !prototype.tbjson.definition ||
-			this.protoRefs[prototype.name]) { 
-			
-			return;
-		}
-
-		this.registerPrototype(prototype);
-
-		for (let key in prototype.definition) {
-
-			let refPrototypes = getPrototypesFromDefinition(prototype.definition[key]);
-
-			for (let ref of refPrototypes) {
-				this.registerPrototypeRecur(ref);
-			}
-		}
-	}
-
-	/**
 	 * Register an array of prototypes.
 	 * 
 	 * Example:
@@ -329,7 +301,12 @@ export default class Tbjson {
 
 				// parent is finalized, so this can be to
 				if (finalizedProtos[prototype.parentCode]) {
-					prototype.definition = Object.assign({}, this.protos[prototype.parentCode].definition, prototype.definition);
+
+					// if the definition isn't an object, just use it and ignore any parent definitions
+					if (typeof prototype.definition == 'object') {
+						prototype.definition = Object.assign({}, this.protos[prototype.parentCode].definition, prototype.definition);
+					}
+
 					finalizedProtos[code] = true;
 				}
 			}
@@ -750,7 +727,9 @@ export default class Tbjson {
 				} else if (Array.isArray(def)) {
 
 					// typed array
-					if (def.length == 2) {
+					if (def.length == 2 && typeof def[0] == 'number') {
+
+						// array
 						if (def[0] == ARRAY) {
 							return ARRAY_OFFSET + this.fmtDef(def[1]);
 
@@ -774,20 +753,24 @@ export default class Tbjson {
 
 						// object
 						} else if (def[0] == OBJECT) {
-							return this.fmtDef(def[0]);
+							return OBJECT_OFFSET + this.fmtDef(def[1]);
 
 						// variable
 						} else if (def[0] == VARIABLE_DEF) {
 							return def;
 						}
-					}
 
 					// fixed length array
-					let fmtDef = [];
-					for (let i = 0; i < def.length; ++i) {
-						fmtDef.push(this.fmtDef(def[i]));
+					} else {
+
+						let fmtDef = [];
+
+						for (let i = 0; i < def.length; ++i) {
+							fmtDef.push(this.fmtDef(def[i]));
+						}
+
+						return fmtDef;
 					}
-					return fmtDef;
 
 				// simple object
 				} else {
@@ -918,13 +901,26 @@ export default class Tbjson {
 
 					this.serializeDef(obj, this.protos[def].definition);
 
-				//variable-length fixed typed array 
-				} else {
+				// variable-length fixed typed array 
+				} else if (def < OBJECT_OFFSET) {
+
 					// write out the length
 					this.writer.write(UINT32, obj.length);
 
 					for (let i = 0; i < obj.length; ++i) {
 						this.serializeDef(obj[i], def - ARRAY_OFFSET);
+					}
+
+				// uniform object
+				} else {
+
+					// write out the length
+					this.writer.write(UINT32, Object.keys(obj).length);
+
+					// write out the keys and values
+					for (let key in obj) {
+						this.writer.write(STRING, key);
+						this.serializeDef(obj[key], def - OBJECT_OFFSET);
 					}
 				}
 
@@ -1179,7 +1175,7 @@ export default class Tbjson {
 				return this.parse(proto.definition ? proto.definition : this.objs[this.reader.read(UINT16)], proto.prototype);
 
 			// variable-length fixed typed array 
-			} else {
+			} else if (def < OBJECT_OFFSET) {
 
 				let length = this.reader.read(UINT32);
 				let objs = [];
@@ -1189,6 +1185,18 @@ export default class Tbjson {
 				}
 
 				return objs;
+
+			// uniform object
+			} else {
+
+				let length = this.reader.read(UINT32);
+				let obj = {};
+
+				for (let i = 0; i < length; ++i) {
+					obj[this.parse(STRING)] = this.parse(def - OBJECT_OFFSET);
+				}
+
+				return obj;
 			}
 
 		// fixed-length array
@@ -1232,7 +1240,9 @@ Tbjson.TYPES = { NULL, BOOL, INT8, UINT8, INT16, UINT16, INT32, UINT32, FLOAT32,
 Tbjson.cast = (obj, prototype, definitions = {}) => {
 
 	// object or array with a definition
-	if (typeof obj == 'object') {
+	if ((typeof prototype =='function' || typeof prototype =='object') && prototype) {
+
+		let isNonNullObject = typeof obj == 'object' && obj;
 
 		let isArray = Array.isArray(prototype);
 		let isArrayTypeDef = isArray && prototype.length == 2;
@@ -1250,30 +1260,42 @@ Tbjson.cast = (obj, prototype, definitions = {}) => {
 				
 			// unknown array
 			} else {
-				for (let i = 0; i < obj.length; ++i) {
+				for (let i = 0; i < prototype.length; ++i) {
 					typedObj.push(Tbjson.cast(obj[i], prototype[i], definitions));
 				}
 			}
 
 			return typedObj;
 
-		// uniform value object
-		} else if (isArrayTypeDef && prototype[0] == OBJECT) {
+		// qualified type
+		} else if (isArrayTypeDef) {
+		
+			switch (prototype[0]) {
 
-			let typedObj = {};
+				// uniform value object
+				case OBJECT:
 
-			for (let key in obj) {
-				typedObj[key] = Tbjson.cast(obj[key], prototype[1], definitions);
+					let typedObj = {};
+
+					if (isNonNullObject) {
+						for (let key in obj) {
+							typedObj[key] = Tbjson.cast(obj[key], prototype[1], definitions);
+						}
+					}
+
+					return typedObj;
+
+				// nullable object
+				case NULLABLE:
+					return obj == null ? null : Tbjson.cast(obj, prototype[1], definitions);
+			
+				// variable def, won't know this when casting
+				case VARIABLE_DEF:
+					return obj;
 			}
 
-			return typedObj;
-
-		// nullable object
-		} else if (isArrayTypeDef && prototype[0] == NULLABLE) {
-			return obj == null ? null : Tbjson.cast(obj, prototype[1], definitions);
-
 		// object
-		} else if (prototype) {
+		} else {
 
 			let typedObj;
 			let definition;
@@ -1307,8 +1329,10 @@ Tbjson.cast = (obj, prototype, definitions = {}) => {
 				definition = prototype;
 			}
 
-			for (let key in obj) {
-				typedObj[key] = Tbjson.cast(obj[key], definition[key], definitions);
+			if (isNonNullObject) {
+				for (let key in definition) {
+					typedObj[key] = Tbjson.cast(obj[key], definition[key], definitions);
+				}
 			}
 
 			// call the build function for post construction
@@ -1332,22 +1356,4 @@ Tbjson.cast = (obj, prototype, definitions = {}) => {
 function getParent(prototype) {
 	let parent = prototype ? Object.getPrototypeOf(prototype) : null;
 	return (parent && parent.name) ? parent : null;
-}
-
-/**
- * Returns a list of prototypes used in a definition.
- * 
- * @param {obj} obj - object to check
- */
-function getPrototypesFromDefinition(obj) {
-
-	let protos = [];
-
-	if (Array.isArray(arr) && arr.length == 2) {
-		protos = protos.concat(getPrototypesFromDefinition(arr[1]));
-	} else if (typeof obj == 'function') {
-		protos.push(obj);
-	}
-		
-	return protos;
 }
