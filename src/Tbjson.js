@@ -1315,12 +1315,21 @@ Tbjson.cast = (obj, prototype, definitions = {}) => {
 
 					definition = prototype.tbjson.definition;
 
-					for (let parent = prototype; parent = getParent(parent);) {
-						if (!parent.tbjson || !parent.tbjson.definition) { break; }
-						definition = Object.assign({}, parent.tbjson.definition, definition);
-					}
+					// only check for a parent if the definition is an object
+					if (typeof definition == 'object') {
 
-					definitions[prototype.name] = definition;
+						for (let parent = prototype; parent = getParent(parent);) {
+							if (!parent.tbjson || !parent.tbjson.definition) { break; }
+							definition = Object.assign({}, parent.tbjson.definition, definition);
+						}
+
+						definitions[prototype.name] = definition;
+					}
+				}
+
+				// fallback to the prototype if definition is an object
+				if (definition == OBJECT) {
+					definition = typedObj;
 				}
 
 			} else {
