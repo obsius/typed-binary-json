@@ -1297,57 +1297,71 @@ Tbjson.cast = (obj, prototype, definitions = {}) => {
 		// object
 		} else {
 
-			let typedObj;
-			let definition;
-			let build;
-
+			// prototype is tbjson with a definition
 			if (prototype.tbjson && prototype.tbjson.definition) {
 
-				typedObj = new prototype();
-				build = prototype.tbjson.build;
+				let typedObj = new prototype();
+				let definition;
 
-				// use map
-				if (definitions[prototype.name]) {
-					definition = definitions[prototype.name];
+				if (isNonNullObject) {
 
-				// check for parent
-				} else {
+					// use map
+					if (definitions[prototype.name]) {
+						definition = definitions[prototype.name];
 
-					definition = prototype.tbjson.definition;
+					// check for parent
+					} else {
 
-					// only check for a parent if the definition is an object
-					if (typeof definition == 'object') {
+						definition = prototype.tbjson.definition;
 
-						for (let parent = prototype; parent = getParent(parent);) {
-							if (!parent.tbjson || !parent.tbjson.definition) { break; }
-							definition = Object.assign({}, parent.tbjson.definition, definition);
+						// only check for a parent if the definition is an object
+						if (typeof definition == 'object') {
+
+							for (let parent = prototype; parent = getParent(parent);) {
+								if (!parent.tbjson || !parent.tbjson.definition) { break; }
+								definition = Object.assign({}, parent.tbjson.definition, definition);
+							}
+
+							definitions[prototype.name] = definition;
+						}
+					}
+
+					// fallback to the prototype if definition is an object
+					if (definition == OBJECT) {
+						if (isNonNullObject) {
+							for (let key in typedObj) {
+								typedObj[key] = obj[key];
+							}
 						}
 
-						definitions[prototype.name] = definition;
+					// continue deeper
+					} else {
+						for (let key in definition) {
+							typedObj[key] = Tbjson.cast(obj[key], definition[key], definitions);
+						}
 					}
 				}
 
-				// fallback to the prototype if definition is an object
-				if (definition == OBJECT) {
-					definition = typedObj;
+				// call the build function for post construction
+				if (prototype.tbjson.build) {
+					build(typedObj);
 				}
 
+				return typedObj;
+
+			// prototype is a raw definition
 			} else {
 
-				typedObj = {};
-				definition = prototype;
-			}
+				let typedObj = {};
 
-			if (isNonNullObject) {
-				for (let key in definition) {
-					typedObj[key] = Tbjson.cast(obj[key], definition[key], definitions);
+				if (isNonNullObject) {
+					for (let key in prototype) {
+						typedObj[key] = Tbjson.cast(obj[key], prototype[key], definitions);
+					}
 				}
+
+				return typedObj;
 			}
-
-			// call the build function for post construction
-			if (build) { build(typedObj); }
-
-			return typedObj;
 		}
 	}
 
