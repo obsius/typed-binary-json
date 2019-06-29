@@ -1344,7 +1344,7 @@ Tbjson.cast = (obj, prototype, definitions = {}) => {
 
 				// call the build function for post construction
 				if (prototype.tbjson.build) {
-					build(typedObj);
+					prototype.tbjson.build(typedObj);
 				}
 
 				return typedObj;
