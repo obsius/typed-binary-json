@@ -1337,7 +1337,9 @@ Tbjson.cast = (obj, prototype, definitions = {}) => {
 					// continue deeper
 					} else {
 						for (let key in definition) {
-							typedObj[key] = Tbjson.cast(obj[key], definition[key], definitions);
+							if (key in obj) {
+								typedObj[key] = Tbjson.cast(obj[key], definition[key], definitions);
+							}
 						}
 					}
 				}
@@ -1356,7 +1358,9 @@ Tbjson.cast = (obj, prototype, definitions = {}) => {
 
 				if (isNonNullObject) {
 					for (let key in prototype) {
-						typedObj[key] = Tbjson.cast(obj[key], prototype[key], definitions);
+						if (key in obj) {
+							typedObj[key] = Tbjson.cast(obj[key], prototype[key], definitions);
+						}
 					}
 				}
 
