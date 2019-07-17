@@ -4,6 +4,8 @@ import {
 	MAGIC_NUMBER,
 	SIZE_MAGIC_NUMBER,
 	
+	ERROR,
+
 	NULL,
 	BOOL,
 	INT8,
@@ -30,7 +32,11 @@ import {
 	PROTOTYPE_OFFSET,
 	NULLABLE_PROTOTYPE_OFFSET,
 	ARRAY_OFFSET,
-	OBJECT_OFFSET
+	OBJECT_OFFSET,
+
+	L_NULLABLE_PROTOTYPE_OFFSET,
+	L_ARRAY_OFFSET,
+	L_OBJECT_OFFSET
 
 } from './constants';
 
@@ -44,8 +50,6 @@ import StreamBufferReader from './StreamBufferReader';
 const DEFAULT_STR_ENCODING = 'utf-8';
 const DEFAULT_NUM_ENCODING = FLOAT64;
 const DEFAULT_BUFFER_SIZE = 1048576;
-
-const ERROR = -1;
 
 /**
  * Tbjson
@@ -72,28 +76,43 @@ export default class Tbjson {
 	root = null;
 
 	// counters for converting types and prototypes to an incrementing numeric value
-	nextTypeCode = TYPE_OFFSET;
-	nextProtoCode = PROTOTYPE_OFFSET;
 	nextObjCode = 0;
+	nextTypeCode = TYPE_OFFSET;
+	nextProtoCode;
 
 	finalized = false;
 
-	// defaults
+	// default offsets
+	offsets = {
+		prototype: PROTOTYPE_OFFSET,
+		nullablePrototype: NULLABLE_PROTOTYPE_OFFSET,
+		array: ARRAY_OFFSET,
+		object: OBJECT_OFFSET
+	};
+
+	// default options
 	options = {
 		encStringAs: DEFAULT_STR_ENCODING,
 		encNumberAs: DEFAULT_NUM_ENCODING,
 		bufferSize: DEFAULT_BUFFER_SIZE
 	};
 	
-	constructor(types = [], prototypes = [], options = {}) {
-		
-		this.registerTypes(types);
-		this.registerPrototypes(prototypes);
-		
+	constructor(types = [], prototypes = [], offsets = {}, options = {}) {
+
+		this.offsets = {
+			...this.offsets,
+			...offsets
+		};
+
 		this.options = {
 			...this.options,
 			...options
 		};
+
+		this.nextProtoCode = this.offsets.prototype;
+
+		this.registerTypes(types);
+		this.registerPrototypes(prototypes);
 	}
 
 	/*-----------------------------------------------------------------------*/
@@ -541,6 +560,7 @@ export default class Tbjson {
 		}
 
 		return {
+			offsets: this.offsets,
 			typeRefs: this.typeRefs,
 			typeDefs: typeDefs,
 			protoRefs: this.protoRefs,
@@ -613,6 +633,20 @@ export default class Tbjson {
 
 			// set the root
 			this.root = header.root;
+
+			// offsets
+			if (header.offsets) {
+				this.offsets = header.offsets;
+
+			// legacy file, use old offsets
+			} else {
+				this.offsets = {
+					prototype: PROTOTYPE_OFFSET,
+					nullablePrototype: L_NULLABLE_PROTOTYPE_OFFSET,
+					array: L_ARRAY_OFFSET,
+					object: L_OBJECT_OFFSET
+				};
+			}
 
 		} catch (e) {
 			e.message = 'Tbjson failed to parse header string: ' + e.message;
@@ -731,7 +765,7 @@ export default class Tbjson {
 
 						// array
 						if (def[0] == ARRAY) {
-							return ARRAY_OFFSET + this.fmtDef(def[1]);
+							return this.offsets.array + this.fmtDef(def[1]);
 
 						// nullable
 						} else if (def[0] == NULLABLE) {
@@ -744,7 +778,7 @@ export default class Tbjson {
 
 							// prototype
 							} else {
-								return NULLABLE_PROTOTYPE_OFFSET + subDef;
+								return this.offsets.nullablePrototype + subDef;
 							}
 
 						// primitive typed array
@@ -753,7 +787,7 @@ export default class Tbjson {
 
 						// object
 						} else if (def[0] == OBJECT) {
-							return OBJECT_OFFSET + this.fmtDef(def[1]);
+							return this.offsets.object + this.fmtDef(def[1]);
 
 						// variable
 						} else if (def[0] == VARIABLE_DEF) {
@@ -869,16 +903,16 @@ export default class Tbjson {
 					this.writer.writeBuffer(Buffer.from(obj.buffer));
 
 				// custom type
-				} else if (def < PROTOTYPE_OFFSET) {
+				} else if (def < this.offsets.prototype) {
 					//TODO
 
 				// known prototype
-				} else if (def < ARRAY_OFFSET) {
+				} else if (def < this.offsets.array) {
 
 					let valid = obj != null && typeof obj == 'object';
 
 					// validate the object
-					if (def < NULLABLE_PROTOTYPE_OFFSET) {
+					if (def < this.offsets.nullablePrototype) {
 						if (!valid) {
 							throw new Error(`Null objects cannot be passed into known prototypes, mark as a nullable known prototype instead: ${this.protos[def] ? this.protos[def].prototype : def}`);
 						}
@@ -886,7 +920,7 @@ export default class Tbjson {
 					// null values allowed, mark it as null or not
 					} else {
 						if (valid) {
-							def -= NULLABLE_PROTOTYPE_OFFSET;
+							def -= this.offsets.nullablePrototype;
 							this.writer.write(BOOL, true);
 						} else {
 							this.writer.write(NULL);
@@ -902,25 +936,41 @@ export default class Tbjson {
 					this.serializeDef(obj, this.protos[def].definition);
 
 				// variable-length fixed typed array 
-				} else if (def < OBJECT_OFFSET) {
+				} else if (def < this.offsets.object) {
 
-					// write out the length
-					this.writer.write(UINT32, obj.length);
+					// if valid, continue
+					if (obj && Array.isArray(obj)) {
 
-					for (let i = 0; i < obj.length; ++i) {
-						this.serializeDef(obj[i], def - ARRAY_OFFSET);
+						// write out the length
+						this.writer.write(UINT32, obj.length);
+
+						for (let i = 0; i < obj.length; ++i) {
+							this.serializeDef(obj[i], def - this.offsets.array);
+						}
+
+					// if not valid, auto-cast into an empty array
+					} else {
+						this.writer.write(UINT32, 0);
 					}
 
 				// uniform object
 				} else {
 
-					// write out the length
-					this.writer.write(UINT32, Object.keys(obj).length);
+					// if valid, continue
+					if (obj && typeof obj == 'object' && !Array.isArray(obj)) {
 
-					// write out the keys and values
-					for (let key in obj) {
-						this.writer.write(STRING, key);
-						this.serializeDef(obj[key], def - OBJECT_OFFSET);
+						// write out the length
+						this.writer.write(UINT32, Object.keys(obj).length);
+
+						// write out the keys and values
+						for (let key in obj) {
+							this.writer.write(STRING, key);
+							this.serializeDef(obj[key], def - this.offsets.object);
+						}
+
+					// if not valid, auto-cast into an empty object
+					} else {
+						this.writer.write(UINT32, 0);
 					}
 				}
 
@@ -964,7 +1014,7 @@ export default class Tbjson {
 				this.writer.write(BOOL, obj);
 				return BOOL;
 
-			// number, use the default number type
+			// number
 			case 'number':
 				this.writer.write(FLOAT64, obj);
 				return FLOAT64;
@@ -1037,9 +1087,6 @@ export default class Tbjson {
 								this.serializeDef(obj, this.protos[code].definition);
 
 								return code;
-							} else {
-								// REMOVE
-								console.log('warning: ', code, obj);
 							}
 
 						// might be a known tbjson prototype
@@ -1081,7 +1128,7 @@ export default class Tbjson {
 			return this.parseAtSelection(this.objs[this.reader.read(UINT16)], selector, path);
 
 		// forward a known prototype
-		} else if (typeof def == 'number' && def >= PROTOTYPE_OFFSET && def < ARRAY_OFFSET) {
+		} else if (typeof def == 'number' && def >= this.offsets.prototype && def < this.offsets.array) {
 			let proto = this.protos[def];
 			return this.parseAtSelection(proto.definition ? proto.definition : this.objs[this.reader.read(UINT16)], selector, path, proto.prototype);
 			
@@ -1153,21 +1200,21 @@ export default class Tbjson {
 				return this.reader.readTypedArray(def - TYPED_ARRAY_OFFSET, this.reader.read(UINT32));
 
 			// custom type
-			} else if (def < PROTOTYPE_OFFSET) {
+			} else if (def < this.offsets.prototype) {
 				return this.reader.read(def);
 
 			// known prototype
-			} else if (def < ARRAY_OFFSET) {
+			} else if (def < this.offsets.array) {
 
 				// nullable
-				if (def >= NULLABLE_PROTOTYPE_OFFSET) {
+				if (def >= this.offsets.nullablePrototype) {
 
 					// null
 					if (!this.reader.read(UINT8)) {
 						return null;
 					}
 
-					def -= NULLABLE_PROTOTYPE_OFFSET;
+					def -= this.offsets.nullablePrototype;
 				}
 
 				let proto = this.protos[def];
@@ -1175,13 +1222,13 @@ export default class Tbjson {
 				return this.parse(proto.definition ? proto.definition : this.objs[this.reader.read(UINT16)], proto.prototype);
 
 			// variable-length fixed typed array 
-			} else if (def < OBJECT_OFFSET) {
+			} else if (def < this.offsets.object) {
 
 				let length = this.reader.read(UINT32);
 				let objs = [];
 
 				for (let i = 0; i < length; ++i) {
-					objs.push(this.parse(def - ARRAY_OFFSET));
+					objs.push(this.parse(def - this.offsets.array));
 				}
 
 				return objs;
@@ -1193,7 +1240,7 @@ export default class Tbjson {
 				let obj = {};
 
 				for (let i = 0; i < length; ++i) {
-					obj[this.parse(STRING)] = this.parse(def - OBJECT_OFFSET);
+					obj[this.parse(STRING)] = this.parse(def - this.offsets.object);
 				}
 
 				return obj;
