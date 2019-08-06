@@ -1377,7 +1377,9 @@ Tbjson.cast = (obj, prototype, definitions = {}) => {
 					if (definition == OBJECT) {
 						if (isNonNullObject) {
 							for (let key in typedObj) {
-								typedObj[key] = obj[key];
+								if (key in obj) {
+									typedObj[key] = obj[key];
+								}
 							}
 						}
 
