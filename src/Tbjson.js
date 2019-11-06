@@ -1081,7 +1081,7 @@ export default class Tbjson {
 						if (code != null) {
 
 							// unbuild
-							if (obj.constructor.tbjson && obj.constructor.tbjson.build) {
+							if (obj.constructor.tbjson && obj.constructor.tbjson.unbuild) {
 								obj = obj.constructor.tbjson.unbuild(obj);
 							}
 
