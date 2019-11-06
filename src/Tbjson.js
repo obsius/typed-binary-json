@@ -1075,31 +1075,20 @@ export default class Tbjson {
 					// the object is a prototype
 					if (obj.constructor) {
 
-						// a known tbjson prototype
-						if (obj.constructor.tbjson) {
+						// a known tbjson prototype to be added, or a lookup if not known
+						let code = obj.constructor.tbjson ? this.registerPrototype(obj.constructor) : this.protoRefs[obj.constructor.name];
 
-							// add this object type to the known prototypes
-							let code = this.registerPrototype(obj.constructor);
+						if (code != null) {
 
-							if (code != null) {
-
-								// process the prototype definition
-								this.serializeDef(obj, this.protos[code].definition);
-
-								return code;
+							// unbuild
+							if (obj.constructor.tbjson && obj.constructor.tbjson.build) {
+								obj = obj.constructor.tbjson.unbuild(obj);
 							}
 
-						// might be a known tbjson prototype
-						} else {
+							// process the prototype definition
+							this.serializeDef(obj, this.protos[code].definition);
 
-							let code = this.protoRefs[obj.constructor.name];
-							if (code) {
-
-								// process the prototype
-								this.serializeDef(obj, this.protos[code].definition);
-
-								return code;
-							}
+							return code;
 						}
 					}
 

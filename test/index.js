@@ -13,6 +13,7 @@ import selection from './selection';
 import typedArray from './typedArray';
 import typedSelection from './typedSelection';
 import strings from './strings';
+import unbuild from './unbuild';
 import variableDefs from './variableDefs';
 
 function stringify(val) {
@@ -65,6 +66,7 @@ function run() {
 	runTest('Typed Array', typedArray);
 	runTest('Typed Selection', typedSelection);
 	runTest('Strings', strings);
+	runTest('Unbuild', unbuild);
 	runTest('Variable Definitions', variableDefs);
 }
 
