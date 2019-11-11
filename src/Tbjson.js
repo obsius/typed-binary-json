@@ -797,10 +797,10 @@ export default class Tbjson {
 					// fixed length array
 					} else {
 
-						let fmtDef = [];
+						let fmtDef = new Array(def.length);
 
 						for (let i = 0; i < def.length; ++i) {
-							fmtDef.push(this.fmtDef(def[i]));
+							fmtDef[i] = this.fmtDef(def[i]);
 						}
 
 						return fmtDef;
@@ -848,7 +848,8 @@ export default class Tbjson {
 			// write the array
 			if (isArray) {
 
-				ref = [];
+				ref = new Array(obj.length);
+
 				for (let i = 0; i < obj.length; ++i) {
 					ref[i] = this.serialize(obj[i]);
 				}
@@ -857,6 +858,7 @@ export default class Tbjson {
 			} else {
 
 				ref = {};
+
 				for (let key in obj) {
 					ref[key] = this.serialize(obj[key]);
 				}
@@ -1033,10 +1035,13 @@ export default class Tbjson {
 
 				// array
 				} else if (Array.isArray(obj)) {
-					let refs = [];
+
+					let refs = new Array(obj.length);
+
 					for (let i = 0; i < obj.length; ++i) {
-						refs.push(this.serialize(obj[i]));
+						refs[i] = this.serialize(obj[i]);
 					}
+
 					return refs;
 
 				// primitive typed array
@@ -1214,10 +1219,10 @@ export default class Tbjson {
 			} else if (def < this.offsets.object) {
 
 				let length = this.reader.read(UINT32);
-				let objs = [];
+				let objs = new Array(length);
 
 				for (let i = 0; i < length; ++i) {
-					objs.push(this.parse(def - this.offsets.array));
+					objs[i] = this.parse(def - this.offsets.array);
 				}
 
 				return objs;
@@ -1238,10 +1243,10 @@ export default class Tbjson {
 		// fixed-length array
 		} else if (Array.isArray(def)) {
 
-			let objs = [];
+			let objs = new Array(def.length);
 
 			for (let i = 0; i < def.length; ++i) {
-				objs.push(this.parse(def[i]));
+				objs[i] = this.parse(def[i]);
 			}
 
 			return objs;
@@ -1271,7 +1276,7 @@ Tbjson.TYPES = { NULL, BOOL, INT8, UINT8, INT16, UINT16, INT32, UINT32, FLOAT32,
  * Cast a plain object into the typed object it represents. Only supports prototype definitions, not strings.
  * 
  * @param {string} obj - object to parse
- * @param {function} obj - prototype to cast into
+ * @param {function} prototype - prototype to cast into
  */
 Tbjson.cast = (obj, prototype, definitions = {}) => {
 
@@ -1286,18 +1291,24 @@ Tbjson.cast = (obj, prototype, definitions = {}) => {
 		// array
 		if (Array.isArray(obj) && isArray) {
 
-			let typedObj = [];
+			let typedObj;
 
 			// typed array
 			if (isArrayTypeDef && prototype[0] == ARRAY) {
+
+				typedObj = new Array(obj.length);
+
 				for (let i = 0; i < obj.length; ++i) {
-					typedObj.push(Tbjson.cast(obj[i], prototype[1], definitions));
+					typedObj[i] = Tbjson.cast(obj[i], prototype[1], definitions);
 				}
 				
 			// unknown array
 			} else {
+
+				typedObj = new Array(prototype.length);
+
 				for (let i = 0; i < prototype.length; ++i) {
-					typedObj.push(Tbjson.cast(obj[i], prototype[i], definitions));
+					typedObj[i] = Tbjson.cast(obj[i], prototype[i], definitions);
 				}
 			}
 
@@ -1408,6 +1419,55 @@ Tbjson.cast = (obj, prototype, definitions = {}) => {
 	}
 
 	// primitive or untyped
+	return obj;
+}
+
+/**
+ * Serialize the typed object into a plain object ignoring typing rules, but obeying which properties should be ignored.
+ * 
+ * @param {string} obj - object to serialize
+ */
+Tbjson.serialize = (obj) => {
+
+	// object or array
+	if (typeof obj == 'object') {
+
+		// array
+		if (Array.isArray(obj)) {
+
+			let retObj = new Array(obj.length);
+
+			for (let i = 0; i < obj.length; ++i) {
+				retObj[i] = Tbjson.serialize(obj[i]);
+			}
+
+			return retObj;
+
+		// object
+		} else {
+
+			let retObj = {};
+
+			// typed
+			if (typeof obj.constructor == 'function' && obj.constructor.tbjson && obj.constructor.tbjson.definition) {
+
+				for (let key in obj.constructor.tbjson.definition) {
+					retObj[key] = Tbjson.serialize(obj[key]);
+				}
+
+			// plain
+			} else {
+
+				for (let key in obj) {
+					retObj[key] = Tbjson.serialize(obj[key]);
+				}
+			}
+
+			return retObj;
+		}
+	}
+
+	// primitive
 	return obj;
 }
 

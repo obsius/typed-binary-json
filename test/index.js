@@ -10,9 +10,10 @@ import nulls from './nulls';
 import nullable from './nullable';
 import plainInTyped from './plainInTyped';
 import selection from './selection';
+import serialize from './serialize';
+import strings from './strings';
 import typedArray from './typedArray';
 import typedSelection from './typedSelection';
-import strings from './strings';
 import unbuild from './unbuild';
 import variableDefs from './variableDefs';
 
@@ -63,9 +64,10 @@ function run() {
 	runTest('Nullable', nullable);
 	runTest('Plain In Typed', plainInTyped);
 	runTest('Selection', selection);
+	runTest('Serialize', serialize);
+	runTest('Strings', strings);
 	runTest('Typed Array', typedArray);
 	runTest('Typed Selection', typedSelection);
-	runTest('Strings', strings);
 	runTest('Unbuild', unbuild);
 	runTest('Variable Definitions', variableDefs);
 }
