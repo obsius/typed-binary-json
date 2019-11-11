@@ -1430,7 +1430,7 @@ Tbjson.cast = (obj, prototype, definitions = {}) => {
 Tbjson.serialize = (obj) => {
 
 	// object or array
-	if (typeof obj == 'object') {
+	if (obj && typeof obj == 'object') {
 
 		// array
 		if (Array.isArray(obj)) {
