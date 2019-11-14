@@ -1512,11 +1512,6 @@ Tbjson.clone = (obj) => {
 					retObj[key] = Tbjson.clone(obj[key]);
 				}
 
-				// build
-				if (obj.constructor.tbjson.build) {
-					retObj = obj.constructor.tbjson.build(retObj);
-				}
-
 				// cast
 				retObj = Tbjson.cast(retObj, obj.constructor);
 
