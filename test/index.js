@@ -1,6 +1,7 @@
 import Tbjson from '../src/Tbjson';
 
 import cast from './cast';
+import clone from './clone';
 import plain from './plain.js';
 import typed from './typed.js';
 import prototype from './prototype';
@@ -55,6 +56,7 @@ function validateTypes(obj1, obj2, path = '$') {
 
 function run() {
 	runTest('Cast', cast);
+	runTest('Clone', clone);
 	runTest('Plain', plain);
 	runTest('Typed', typed);
 	runTest('Prototype', prototype);

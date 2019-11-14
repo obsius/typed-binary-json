@@ -1280,8 +1280,8 @@ Tbjson.TYPES = { NULL, BOOL, INT8, UINT8, INT16, UINT16, INT32, UINT32, FLOAT32,
  */
 Tbjson.cast = (obj, prototype, definitions = {}) => {
 
-	// object or array with a definition
-	if ((typeof prototype =='function' || typeof prototype =='object') && prototype) {
+	// plain object or array with a definition (ignore prototyped)
+	if ((!obj || !obj.prototype) && (typeof prototype =='function' || typeof prototype =='object') && prototype) {
 
 		let isNonNullObject = typeof obj == 'object' && obj;
 
@@ -1375,11 +1375,9 @@ Tbjson.cast = (obj, prototype, definitions = {}) => {
 
 					// fallback to the prototype if definition is an object
 					if (definition == OBJECT) {
-						if (isNonNullObject) {
-							for (let key in typedObj) {
-								if (key in obj) {
-									typedObj[key] = obj[key];
-								}
+						for (let key in typedObj) {
+							if (key in obj) {
+								typedObj[key] = obj[key];
 							}
 						}
 
@@ -1418,7 +1416,7 @@ Tbjson.cast = (obj, prototype, definitions = {}) => {
 		}
 	}
 
-	// primitive or untyped
+	// primitive, untyped, or prototyped
 	return obj;
 }
 
@@ -1451,6 +1449,11 @@ Tbjson.serialize = (obj) => {
 			// typed
 			if (typeof obj.constructor == 'function' && obj.constructor.tbjson && obj.constructor.tbjson.definition) {
 
+				// unbuild
+				if (obj.constructor.tbjson.unbuild) {
+					obj.constructor.tbjson.unbuild(retObj);
+				}
+
 				for (let key in obj.constructor.tbjson.definition) {
 					retObj[key] = Tbjson.serialize(obj[key]);
 				}
@@ -1460,6 +1463,72 @@ Tbjson.serialize = (obj) => {
 
 				for (let key in obj) {
 					retObj[key] = Tbjson.serialize(obj[key]);
+				}
+			}
+
+			return retObj;
+		}
+	}
+
+	// primitive
+	return obj;
+}
+
+/**
+ * Clone the typed object into a prototyped object ignoring typing rules, but obeying which properties should be ignored.
+ * 
+ * @param {string} obj - object to serialize
+ */
+Tbjson.clone = (obj) => {
+
+	// object or array
+	if (obj && typeof obj == 'object') {
+
+		// array
+		if (Array.isArray(obj)) {
+
+			let retObj = new Array(obj.length);
+
+			for (let i = 0; i < obj.length; ++i) {
+				retObj[i] = Tbjson.clone(obj[i]);
+			}
+
+			return retObj;
+
+		// object
+		} else {
+
+			let retObj = {};
+
+			// typed
+			if (typeof obj.constructor == 'function' && obj.constructor.tbjson && obj.constructor.tbjson.definition) {
+
+				// unbuild
+				if (obj.constructor.tbjson.unbuild) {
+					retObj = obj.constructor.tbjson.unbuild(retObj);
+				}
+
+				for (let key in obj.constructor.tbjson.definition) {
+					retObj[key] = Tbjson.clone(obj[key]);
+				}
+
+				// build
+				if (obj.constructor.tbjson.build) {
+					retObj = obj.constructor.tbjson.build(retObj);
+				}
+
+				// cast
+				retObj = Tbjson.cast(retObj, obj.constructor);
+
+			// date object
+			} else if (obj instanceof Date) {
+				retObj = new Date(obj.getTime());
+
+			// plain
+			} else {
+
+				for (let key in obj) {
+					retObj[key] = Tbjson.clone(obj[key]);
 				}
 			}
 
