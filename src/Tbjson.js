@@ -1449,12 +1449,14 @@ Tbjson.serialize = (obj) => {
 			// typed
 			if (typeof obj.constructor == 'function' && obj.constructor.tbjson && obj.constructor.tbjson.definition) {
 
+				let constructor = obj.constructor;
+				
 				// unbuild
-				if (obj.constructor.tbjson.unbuild) {
-					obj.constructor.tbjson.unbuild(retObj);
+				if (constructor.tbjson.unbuild) {
+					obj = constructor.tbjson.unbuild(retObj);
 				}
 
-				for (let key in obj.constructor.tbjson.definition) {
+				for (let key in constructor.tbjson.definition) {
 					retObj[key] = Tbjson.serialize(obj[key]);
 				}
 
@@ -1503,17 +1505,19 @@ Tbjson.clone = (obj) => {
 			// typed
 			if (typeof obj.constructor == 'function' && obj.constructor.tbjson && obj.constructor.tbjson.definition) {
 
+				let constructor = obj.constructor;
+
 				// unbuild
-				if (obj.constructor.tbjson.unbuild) {
-					obj = obj.constructor.tbjson.unbuild(obj);
+				if (constructor.tbjson.unbuild) {
+					obj = constructor.tbjson.unbuild(obj);
 				}
 
-				for (let key in obj.constructor.tbjson.definition) {
+				for (let key in constructor.tbjson.definition) {
 					retObj[key] = Tbjson.clone(obj[key]);
 				}
 
 				// cast
-				retObj = Tbjson.cast(retObj, obj.constructor);
+				retObj = Tbjson.cast(retObj, constructor);
 
 			// date object
 			} else if (obj instanceof Date) {
