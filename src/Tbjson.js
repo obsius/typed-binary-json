@@ -1505,7 +1505,7 @@ Tbjson.clone = (obj) => {
 
 				// unbuild
 				if (obj.constructor.tbjson.unbuild) {
-					retObj = obj.constructor.tbjson.unbuild(retObj);
+					obj = obj.constructor.tbjson.unbuild(obj);
 				}
 
 				for (let key in obj.constructor.tbjson.definition) {
