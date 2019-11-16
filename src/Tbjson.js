@@ -1425,7 +1425,7 @@ Tbjson.cast = (obj, prototype, definitions = {}) => {
  * 
  * @param {string} obj - object to serialize
  */
-Tbjson.serialize = (obj) => {
+Tbjson.serialize = (obj, definitions = {}) => {
 
 	// object or array
 	if (obj && typeof obj == 'object') {
@@ -1436,7 +1436,7 @@ Tbjson.serialize = (obj) => {
 			let retObj = new Array(obj.length);
 
 			for (let i = 0; i < obj.length; ++i) {
-				retObj[i] = Tbjson.serialize(obj[i]);
+				retObj[i] = Tbjson.serialize(obj[i], definitions);
 			}
 
 			return retObj;
@@ -1449,6 +1449,21 @@ Tbjson.serialize = (obj) => {
 			// typed
 			if (typeof obj.constructor == 'function' && obj.constructor.tbjson && obj.constructor.tbjson.definition) {
 
+				let definition = definitions[obj.constructor.name];
+
+				// do a lookup for the parent definitions and flatten into one
+				if (!definition) {
+
+					definition = obj.constructor.tbjson.definition;
+
+					for (let parent = obj.constructor; parent = getParent(parent);) {
+						if (!parent.tbjson || !parent.tbjson.definition) { break; }
+						definition = Object.assign({}, parent.tbjson.definition, definition);
+					}
+
+					definitions[obj.constructor.name] = definition;
+				}
+
 				let constructor = obj.constructor;
 				
 				// unbuild
@@ -1456,15 +1471,15 @@ Tbjson.serialize = (obj) => {
 					obj = constructor.tbjson.unbuild(obj);
 				}
 
-				for (let key in constructor.tbjson.definition) {
-					retObj[key] = Tbjson.serialize(obj[key]);
+				for (let key in definition) {
+					retObj[key] = Tbjson.serialize(obj[key], definitions);
 				}
 
 			// plain
 			} else {
 
 				for (let key in obj) {
-					retObj[key] = Tbjson.serialize(obj[key]);
+					retObj[key] = Tbjson.serialize(obj[key], definitions);
 				}
 			}
 
@@ -1481,7 +1496,7 @@ Tbjson.serialize = (obj) => {
  * 
  * @param {string} obj - object to serialize
  */
-Tbjson.clone = (obj) => {
+Tbjson.clone = (obj, definitions = {}) => {
 
 	// object or array
 	if (obj && typeof obj == 'object') {
@@ -1492,7 +1507,7 @@ Tbjson.clone = (obj) => {
 			let retObj = new Array(obj.length);
 
 			for (let i = 0; i < obj.length; ++i) {
-				retObj[i] = Tbjson.clone(obj[i]);
+				retObj[i] = Tbjson.clone(obj[i], definitions);
 			}
 
 			return retObj;
@@ -1505,6 +1520,21 @@ Tbjson.clone = (obj) => {
 			// typed
 			if (typeof obj.constructor == 'function' && obj.constructor.tbjson && obj.constructor.tbjson.definition) {
 
+				let definition = definitions[obj.constructor.name];
+
+				// do a lookup for the parent definitions and flatten into one
+				if (!definition) {
+
+					definition = obj.constructor.tbjson.definition;
+
+					for (let parent = obj.constructor; parent = getParent(parent);) {
+						if (!parent.tbjson || !parent.tbjson.definition) { break; }
+						definition = Object.assign({}, parent.tbjson.definition, definition);
+					}
+
+					definitions[obj.constructor.name] = definition;
+				}
+
 				let constructor = obj.constructor;
 
 				// unbuild
@@ -1513,7 +1543,7 @@ Tbjson.clone = (obj) => {
 				}
 
 				for (let key in constructor.tbjson.definition) {
-					retObj[key] = Tbjson.clone(obj[key]);
+					retObj[key] = Tbjson.clone(obj[key], definitions);
 				}
 
 				// cast
@@ -1527,7 +1557,7 @@ Tbjson.clone = (obj) => {
 			} else {
 
 				for (let key in obj) {
-					retObj[key] = Tbjson.clone(obj[key]);
+					retObj[key] = Tbjson.clone(obj[key], definitions);
 				}
 			}
 
