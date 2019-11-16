@@ -1453,7 +1453,7 @@ Tbjson.serialize = (obj) => {
 				
 				// unbuild
 				if (constructor.tbjson.unbuild) {
-					obj = constructor.tbjson.unbuild(retObj);
+					obj = constructor.tbjson.unbuild(obj);
 				}
 
 				for (let key in constructor.tbjson.definition) {

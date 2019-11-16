@@ -1,6 +1,6 @@
 {
 	"name": "typed-binary-json",
-	"version": "1.14.5",
+	"version": "1.14.6",
 	"description": "A TBJSON parser and serializer.",
 	"author": "Jeff Seaman <mr.jeffrey.seaman@gmail.com> (https://www.ngc6822.com)",
 	"license": "MIT",
