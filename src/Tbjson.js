@@ -1281,12 +1281,12 @@ Tbjson.TYPES = { NULL, BOOL, INT8, UINT8, INT16, UINT16, INT32, UINT32, FLOAT32,
 Tbjson.cast = (obj, prototype, definitions = {}) => {
 
 	// plain object or array with a definition (ignore prototyped)
-	if ((!obj || !obj.prototype) && (typeof prototype =='function' || typeof prototype =='object') && prototype) {
+	if (prototype && (typeof prototype =='function' || typeof prototype =='object')) {
 
 		let isNonNullObject = typeof obj == 'object' && obj;
 
 		let isArray = Array.isArray(prototype);
-		let isArrayTypeDef = isArray && prototype.length == 2;
+		let isArrayTypeDef = Array.isArray(prototype) && prototype.length == 2;
 
 		// array
 		if (Array.isArray(obj) && isArray) {
@@ -1341,8 +1341,8 @@ Tbjson.cast = (obj, prototype, definitions = {}) => {
 					return obj;
 			}
 
-		// object
-		} else {
+		// non-prototyped object
+		} else if (!obj || !obj.constructor || obj.constructor.prototype == Object.prototype) {
 
 			// prototype is tbjson with a definition
 			if (prototype.tbjson && prototype.tbjson.definition) {

@@ -1,18 +1,32 @@
 {
 	"name": "typed-binary-json",
-	"version": "1.14.4",
+	"version": "1.14.5",
 	"description": "A TBJSON parser and serializer.",
-	"author": "Jeff Seaman",
-	"contributors": [
-		"Jeff Seaman <mr.jeffrey.seaman@gmail.com> (https://www.ngc6822.com)"
-	],
+	"author": "Jeff Seaman <mr.jeffrey.seaman@gmail.com> (https://www.ngc6822.com)",
 	"license": "MIT",
 	"main": "index.js",
+	"homepage": "https://github.com/obsius/typed-binary-json",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/obsius/typed-binary-json.git"
+	},
+	"bugs": {
+		"url": "https://github.com/obsius/typed-binary-json/issues"
+	},
 	"scripts": {
 		"prepare": "rollup -c",
 		"start": "nodemon --inspect dev.js --exec babel-node",
 		"benchmarks": "babel-node benchmarks.js",
 		"test": "babel-node test"
+	},
+	"devDependencies": {
+		"@babel/core": "^7.7.2",
+		"@babel/node": "^7.7.0",
+		"@babel/plugin-proposal-class-properties": "^7.7.0",
+		"@babel/preset-env": "^7.7.1",
+		"nodemon": "^1.19.4",
+		"rollup": "^1.27.0",
+		"rollup-plugin-babel": "^4.3.3"
 	},
 	"babel": {
 		"plugins": [
@@ -28,19 +42,6 @@
 				}
 			]
 		]
-	},
-	"devDependencies": {
-		"@babel/core": "^7.7.2",
-		"@babel/node": "^7.7.0",
-		"@babel/plugin-proposal-class-properties": "^7.7.0",
-		"@babel/preset-env": "^7.7.1",
-		"nodemon": "^1.19.4",
-		"rollup": "^1.27.0",
-		"rollup-plugin-babel": "^4.3.3"
-	},
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/obsius/typed-binary-json.git"
 	},
 	"keywords": [
 		"json",
