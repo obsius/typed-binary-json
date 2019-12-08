@@ -1,6 +1,6 @@
 {
 	"name": "typed-binary-json",
-	"version": "1.14.7",
+	"version": "1.14.8",
 	"description": "A TBJSON parser and serializer.",
 	"author": "Jeff Seaman <mr.jeffrey.seaman@gmail.com> (https://www.ngc6822.com)",
 	"license": "MIT",
@@ -20,12 +20,12 @@
 		"test": "babel-node test"
 	},
 	"devDependencies": {
-		"@babel/core": "^7.7.2",
-		"@babel/node": "^7.7.0",
-		"@babel/plugin-proposal-class-properties": "^7.7.0",
-		"@babel/preset-env": "^7.7.1",
+		"@babel/core": "^7.7.5",
+		"@babel/node": "^7.7.4",
+		"@babel/plugin-proposal-class-properties": "^7.7.4",
+		"@babel/preset-env": "^7.7.6",
 		"nodemon": "^1.19.4",
-		"rollup": "^1.27.0",
+		"rollup": "^1.27.9",
 		"rollup-plugin-babel": "^4.3.3"
 	},
 	"babel": {

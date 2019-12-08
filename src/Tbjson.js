@@ -1548,7 +1548,7 @@ Tbjson.clone = (obj, definitions = {}) => {
 
 				// generic clone function
 				} else {
-					for (let key in constructor.tbjson.definition) {
+					for (let key in definition) {
 						retObj[key] = Tbjson.clone(obj[key], definitions);
 					}
 
