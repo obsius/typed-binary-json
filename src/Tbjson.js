@@ -1542,12 +1542,19 @@ Tbjson.clone = (obj, definitions = {}) => {
 					obj = constructor.tbjson.unbuild(obj);
 				}
 
-				for (let key in constructor.tbjson.definition) {
-					retObj[key] = Tbjson.clone(obj[key], definitions);
-				}
+				// custom clone function
+				if (constructor.tbjson.clone) {
+					retObj = constructor.tbjson.clone(obj);
 
-				// cast
-				retObj = Tbjson.cast(retObj, constructor);
+				// generic clone function
+				} else {
+					for (let key in constructor.tbjson.definition) {
+						retObj[key] = Tbjson.clone(obj[key], definitions);
+					}
+
+					// cast
+					retObj = Tbjson.cast(retObj, constructor);
+				}
 
 			// date object
 			} else if (obj instanceof Date) {
