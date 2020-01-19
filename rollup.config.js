@@ -3,7 +3,7 @@ import babel from 'rollup-plugin-babel';
 export default {
 	input: 'src/Tbjson.js',
 	output: {
-		file: 'lib/Tbjson.js',
+		file: 'lib/index.js',
 		format: 'cjs'
 	},
 	plugins: [
