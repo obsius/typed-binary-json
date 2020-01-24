@@ -1,6 +1,6 @@
 {
 	"name": "typed-binary-json",
-	"version": "1.14.9",
+	"version": "1.14.10",
 	"description": "A TBJSON parser and serializer.",
 	"homepage": "https://github.com/obsius/typed-binary-json",
 	"author": "Jeff Seaman <mr.jeffrey.seaman@gmail.com> (https://www.ngc6822.com)",

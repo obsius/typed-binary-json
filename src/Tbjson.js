@@ -930,11 +930,19 @@ export default class Tbjson {
 						}
 					}
 				
-					// register the prototype if needed
+					// known type
 					if (obj.constructor.tbjson) {
+
+						// register the prototype if needed
 						this.registerPrototype(obj.constructor);
+
+						// call the unbuild function for pre serialization 
+						if (obj.constructor.tbjson.unbuild) {
+							obj = obj.constructor.tbjson.unbuild(obj);
+						}
 					}
 
+					
 					this.serializeDef(obj, this.protos[def].definition);
 
 				// variable-length fixed typed array 
