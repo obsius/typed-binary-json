@@ -2,6 +2,7 @@ import Tbjson from '../src/Tbjson';
 
 import cast from './cast';
 import clone from './clone';
+import definition from './definition';
 import plain from './plain.js';
 import typed from './typed.js';
 import prototype from './prototype';
@@ -57,17 +58,18 @@ function validateTypes(obj1, obj2, path = '$') {
 function run() {
 	runTest('Cast', cast);
 	runTest('Clone', clone);
-	runTest('Plain', plain);
-	runTest('Typed', typed);
-	runTest('Prototype', prototype);
+	runTest('Definition', definition);
 	runTest('Inheritance', inheritance);
 	runTest('Nested', nested);
 	runTest('Nulls', nulls);
 	runTest('Nullable', nullable);
+	runTest('Plain', plain);
 	runTest('Plain In Typed', plainInTyped);
+	runTest('Prototype', prototype);
 	runTest('Selection', selection);
 	runTest('Serialize', serialize);
 	runTest('Strings', strings);
+	runTest('Typed', typed);
 	runTest('Typed Array', typedArray);
 	runTest('Typed Selection', typedSelection);
 	runTest('Unbuild', unbuild);
