@@ -122,7 +122,7 @@ export default class Tbjson {
 	 * Register a variable definition so that any prototypes with the same variable definition id are replaced before serializing.
 	 * 
 	 * @param { number | string } id - the identifier of this variable definition
-	 * @param {obj} def - the definition to set to
+	 * @param { obj } def - the definition to set to
 	 */
 	registerVariableDef(id, def) {
 		this.variableDefs[id] = def;
@@ -245,7 +245,7 @@ export default class Tbjson {
 	 *     }
 	 * }]
 	 * 
-	 * @param {[]object} prototypes - array of prototypes 
+	 * @param { []object } prototypes - array of prototypes 
 	 */
 	registerPrototypes(prototypes = []) {
 		for (let prototype of prototypes) {
@@ -261,7 +261,7 @@ export default class Tbjson {
 	 * 
 	 * tbjson.registerType('Float48', (data, buffer) => {}, (buffer) => obj);
 	 * 
-	 * @param {object} type - type to add
+	 * @param { object } type - type to add
 	 */
 	registerType(type) {
 		
@@ -284,7 +284,7 @@ export default class Tbjson {
 	 *     }
 	 * }]
 	 * 
-	 * @param {[]object} types - array of types to register 
+	 * @param { []object } types - array of types to register 
 	 */
 	registerTypes(types = []) {
 		for (let type of types) {
@@ -340,7 +340,7 @@ export default class Tbjson {
 	/**
 	 * Serialize the obj to a buffer.  Fastest, but uses the most memory.
 	 * 
-	 * @param {object} obj - object to serialize 
+	 * @param { object } obj - object to serialize 
 	 */
 	serializeToBuffer(obj) {
 		try {
@@ -365,8 +365,8 @@ export default class Tbjson {
 	/**
 	 * Serialize the object to the stream.  Slower, but uses the least memory.
 	 * 
-	 * @param {stream} stream - stream to serialize to
-	 * @param {object} obj - object to serialize 
+	 * @param { stream } stream - stream to serialize to
+	 * @param { object } obj - object to serialize 
 	 */
 	serializeToStream(stream, obj) {
 		try {
@@ -391,8 +391,8 @@ export default class Tbjson {
 	/**
 	 * Serialize the object to a file. Opens as a write stream, so it's slower and uses less memory.
 	 * 
-	 * @param {string} filename - filename / path to write to
-	 * @param {object} obj - object to serialize
+	 * @param { string } filename - filename / path to write to
+	 * @param { object } obj - object to serialize
 	 */
 	serializeToFile(filename, obj) {
 		return new Promise((res, rej) => {
@@ -437,8 +437,8 @@ export default class Tbjson {
 	/**
 	 * Parse a TBJSON containing buffer into ab object. Fastest, but uses the most memory.
 	 * 
-	 * @param {buffer} buffer - buffer to read from
-	 * @param {array} selector - anarray that indicates the selected object path
+	 * @param { buffer } buffer - buffer to read from
+	 * @param { array } selector - anarray that indicates the selected object path
 	 */
 	parseBuffer(buffer, selector = null) {
 		try {
@@ -477,8 +477,8 @@ export default class Tbjson {
 	 * TODO:
 	 * Parse a TBJSON containing stream into an object. Slower, but uses the least memory.
 	 * 
-	 * @param {stream} stream - stream to read from
-	 * @param {array} selector - anarray that indicates the selected object path
+	 * @param { stream } stream - stream to read from
+	 * @param { array } selector - anarray that indicates the selected object path
 	 */
 	parseStream(stream, selector = null) {
 		return new Promise(async (res, rej) => {
@@ -508,8 +508,8 @@ export default class Tbjson {
 	/**
 	 * Parse a TBJSON file into the object it represents. Faster, but uses more memory.
 	 * 
-	 * @param {string} filename - filename / path to read from
-	 * @param {array} selector - anarray that indicates the selected object path
+	 * @param { string } filename - filename / path to read from
+	 * @param { array } selector - anarray that indicates the selected object path
 	 */
 	parseFileAsBuffer(filename, selector = null) {
 		try {
@@ -523,8 +523,8 @@ export default class Tbjson {
 	/**
 	 * Parse a TBJSON file into the object it represents. Slower, but uses less memory.
 	 * 
-	 * @param {string} filename - filename / path to read from
-	 * @param {array} selector - anarray that indicates the selected object path
+	 * @param { string } filename - filename / path to read from
+	 * @param { array } selector - anarray that indicates the selected object path
 	 */
 	async parseFileAsStream(filename, selector = null) {
 		try {
@@ -604,7 +604,7 @@ export default class Tbjson {
 	 * Parse a TBJSON header from a string.
 	 * Useful if you are writing your own deserializer.
 	 * 
-	 * @param {string} headerStr - string containing the encoded JSON header 
+	 * @param { string } headerStr - string containing the encoded JSON header 
 	 */
 	parseHeader(headerStr) {
 		try {
@@ -655,7 +655,7 @@ export default class Tbjson {
 	}
 
 	/*-----------------------------------------------------------------------*/
-	/* private */
+	/* internal */
 
 	/**
 	 * Process all prototype definitions and variable definitions.
@@ -671,7 +671,7 @@ export default class Tbjson {
 	/**
 	 * Replace a variable definition with the corresponding registered one.
 	 * 
-	 * @param {obj} def - the definition to check and replace 
+	 * @param { obj } def - the definition to check and replace 
 	 */
 	replaceVariableDefs(def) {
 		if (typeof def == 'object') {
@@ -1014,7 +1014,7 @@ export default class Tbjson {
 	 * Serialize an object. Can be known (TBJSON has a definition for it) or plain (Class or object that TBJSON doesn't have a definition for).
 	 * Calls serializeDef() if a known type is found.
 	 * 
-	 * @param {object} obj - the object to serialize
+	 * @param { object } obj - the object to serialize
 	 */
 	serialize(obj) {
 		switch (typeof obj) {
@@ -1121,7 +1121,7 @@ export default class Tbjson {
 	 * TODO: IMPLEMENT NULL READER TO SKIP ENTRIES FOR PERFORMANCE
 	 * 
 	 * @param { object | array | number } def - the definition specifying how to decode the binary data
-	 * @param {array} selector - quit early and return the value selected by this
+	 * @param { array } selector - quit early and return the value selected by this
 	 */
 	parseAtSelection(def, selector, path = [], prototype) {
 
@@ -1163,7 +1163,7 @@ export default class Tbjson {
 	 * Parse a definition.
 	 * 
 	 * @param { object | array | number } def - the definition specifying how to decode the binary data
-	 * @param {function} prototype - [optional] create this type during object instantiation
+	 * @param { function } [prototype] - create this type during object instantiation
 	 */
 	parse(def, prototype) {
 
@@ -1283,8 +1283,8 @@ Tbjson.TYPES = { NULL, BOOL, INT8, UINT8, INT16, UINT16, INT32, UINT32, FLOAT32,
 /**
  * Cast a plain object into the typed object it represents. Only supports prototype definitions, not strings.
  * 
- * @param {string} obj - object to parse
- * @param {function} prototype - prototype to cast into
+ * @param { string } obj - object to parse
+ * @param { function } prototype - prototype to cast into
  */
 Tbjson.cast = (obj, prototype, definitions = {}) => {
 
@@ -1431,7 +1431,7 @@ Tbjson.cast = (obj, prototype, definitions = {}) => {
 /**
  * Serialize the typed object into a plain object ignoring typing rules, but obeying which properties should be ignored.
  * 
- * @param {string} obj - object to serialize
+ * @param { string } obj - object to serialize
  */
 Tbjson.serialize = (obj, definitions = {}) => {
 
@@ -1502,7 +1502,7 @@ Tbjson.serialize = (obj, definitions = {}) => {
 /**
  * Clone the typed object into a prototyped object ignoring typing rules, but obeying which properties should be ignored.
  * 
- * @param {string} obj - object to serialize
+ * @param { string } obj - object to serialize
  */
 Tbjson.clone = (obj, definitions = {}) => {
 
@@ -1587,7 +1587,7 @@ Tbjson.clone = (obj, definitions = {}) => {
 /**
  * Return the flattened TBJSON definition. For prototypes that have parents.
  * 
- * @param {obj} obj - object to compute definition of 
+ * @param { obj } obj - object to compute definition of 
  */
 Tbjson.definition = (obj) => {
 	if (obj && typeof obj == 'object' && obj.constructor.tbjson && obj.constructor.tbjson.definition) {
@@ -1608,7 +1608,7 @@ Tbjson.definition = (obj) => {
 /**
  * Return the parent of a prototype.
  * 
- * @param {function} prototype - prototype to check for parent of 
+ * @param { function } prototype - prototype to check for parent of 
  */
 function getParent(prototype) {
 	let parent = prototype ? Object.getPrototypeOf(prototype) : null;

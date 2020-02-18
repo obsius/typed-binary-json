@@ -10,7 +10,7 @@ export default class StreamBufferWriter extends BufferWriter {
 		this.stream = stream;
 	}
 
-	/* private */
+	/* internal */
 
 	flush() {
 

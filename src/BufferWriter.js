@@ -160,7 +160,7 @@ export default class BufferWriter {
 		this.offset += buffer.length;
 	}
 
-	/* private */
+	/* internal */
 
 	checkSize(size) {
 		while (this.offset + size > this.size) {

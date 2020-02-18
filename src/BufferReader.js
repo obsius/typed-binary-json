@@ -134,7 +134,7 @@ export default class BufferReader {
 		}
 	}
 
-	/* private */
+	/* internal */
 
 	nextNullAt() {
 		for (let i = this.offset; i < this.buffer.length; ++i) {

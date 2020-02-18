@@ -63,7 +63,7 @@ export default class StreamBufferReader {
 		}
 	}
 
-	/* private */
+	/* internal */
 
 	incReadOffset(length) {
 		this.readOffset += length;
