@@ -36,8 +36,12 @@ import {
 
 	L_NULLABLE_PROTOTYPE_OFFSET,
 	L_ARRAY_OFFSET,
-	L_OBJECT_OFFSET
+	L_OBJECT_OFFSET,
 
+	DEFAULT_BUFFER_SIZE,
+	DEFAULT_NUM_ENCODING,
+	DEFAULT_STR_ENCODING,
+	DEFAULT_X_FACTOR
 } from './constants';
 
 import Type from './Type';
@@ -46,10 +50,6 @@ import BufferWriter from './BufferWriter';
 import BufferReader from './BufferReader';
 import StreamBufferWriter from './StreamBufferWriter';
 import StreamBufferReader from './StreamBufferReader';
-
-const DEFAULT_STR_ENCODING = 'utf-8';
-const DEFAULT_NUM_ENCODING = FLOAT64;
-const DEFAULT_BUFFER_SIZE = 1048576;
 
 /**
  * Tbjson
@@ -92,9 +92,10 @@ export default class Tbjson {
 
 	// default options
 	options = {
-		encStringAs: DEFAULT_STR_ENCODING,
-		encNumberAs: DEFAULT_NUM_ENCODING,
-		bufferSize: DEFAULT_BUFFER_SIZE
+		bufferSize: DEFAULT_BUFFER_SIZE,
+		numEncoding: DEFAULT_NUM_ENCODING,
+		strEncoding: DEFAULT_STR_ENCODING,
+		xFactor: DEFAULT_X_FACTOR
 	};
 	
 	constructor(types = [], prototypes = [], offsets = {}, options = {}) {
@@ -348,7 +349,7 @@ export default class Tbjson {
 			this.processVariableDefs();
 
 			// make a writer
-			this.writer = new BufferWriter(this.options.bufferSize);
+			this.writer = new BufferWriter(this.options.bufferSize, this.options.xFactor, this.options.strEncoding);
 
 			// process the obj
 			this.root = this.serialize(obj);
@@ -374,7 +375,7 @@ export default class Tbjson {
 			this.processVariableDefs();
 
 			// make a writer
-			this.writer = new StreamBufferWriter(stream, this.options.bufferSize);
+			this.writer = new StreamBufferWriter(stream, this.options.bufferSize, this.options.xFactor, this.options.strEncoding);
 
 			// process the obj
 			this.root = this.serialize(obj);
@@ -447,7 +448,7 @@ export default class Tbjson {
 				throw new Error('Null buffer passed in');
 			}
 
-			this.reader = new BufferReader(buffer);
+			this.reader = new BufferReader(buffer, this.options.strEncoding);
 
 			// validate the buffer type
 			if (this.reader.readFixedLengthString(SIZE_MAGIC_NUMBER) != MAGIC_NUMBER) {
@@ -587,12 +588,12 @@ export default class Tbjson {
 			buffer.writeFixedLengthString(MAGIC_NUMBER);
 
 			// uint32 - header length
-			buffer.write(UINT32, headerStr.length);
+			buffer.write(UINT32, Buffer.byteLength(headerStr, this.strEncoding));
 
 			// str - header
 			buffer.writeFixedLengthString(headerStr);
 
-			return buffer.buffer;
+			return buffer.getBuffer();
 
 		} catch (e) {
 			e.message = 'Tbjson failed to create a buffer for the header: ' + e.message;

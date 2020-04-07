@@ -4,17 +4,21 @@ import {
 	STRING,
 
 	SIZE_UINT32,
-	SIZE_FLOAT32
+	SIZE_FLOAT32,
+
+	DEFAULT_BUFFER_SIZE,
+	DEFAULT_STR_ENCODING
 } from './constants';
 
 export default class StreamBufferReader {
 
-	constructor(stream, size = 8388608) {
+	constructor(stream, size = DEFAULT_BUFFER_SIZE, strEncoding = DEFAULT_STR_ENCODING) {
 
 		this.stream = stream;
 		this.size = size;
-		this.tempSize = size;
+		this.strEncoding = strEncoding;
 
+		this.tempSize = size;
 		this.buffer = Buffer.allocUnsafe(size);
 
 		this.writeOffset = 0;
@@ -56,7 +60,7 @@ export default class StreamBufferReader {
 				
 			case STRING:
 				if (length) {
-					this.readBytes(length, (readOffset) => fn(this.buffer.toString('utf-8', readOffset, length)));
+					this.readBytes(length, (readOffset) => fn(this.buffer.toString(this.strEncoding, readOffset, length)));
 				} else {
 					this.readUntilNull();
 				}

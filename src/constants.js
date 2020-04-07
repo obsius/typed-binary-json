@@ -53,3 +53,9 @@ export const OBJECT_OFFSET =                4096; // support 4x nested array
 export const L_NULLABLE_PROTOTYPE_OFFSET =  160;
 export const L_ARRAY_OFFSET =               256;
 export const L_OBJECT_OFFSET =              1024;
+
+// defaults
+export const DEFAULT_BUFFER_SIZE =          1048576;
+export const DEFAULT_NUM_ENCODING =         FLOAT64;
+export const DEFAULT_STR_ENCODING =         'utf8';
+export const DEFAULT_X_FACTOR =             2;

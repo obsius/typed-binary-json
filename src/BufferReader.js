@@ -18,15 +18,18 @@ import {
 	SIZE_UINT32,
 	SIZE_INT32,
 	SIZE_FLOAT32,
-	SIZE_FLOAT64
+	SIZE_FLOAT64,
+
+	DEFAULT_STR_ENCODING
 } from './constants';
 
 export default class BufferReader {
 
 	offset = 0;
 
-	constructor(buffer) {
+	constructor(buffer, strEncoding = DEFAULT_STR_ENCODING) {
 		this.buffer = buffer;
+		this.strEncoding = strEncoding;
 	}
 
 	read(type) {
@@ -80,9 +83,21 @@ export default class BufferReader {
 				break;
 
 			case STRING:
-				let length = this.readVariableUint();
-				data = this.buffer.toString('utf-8', this.offset, this.offset + length);
+
+				let length;
+
+				if (this.buffer[this.offset] < 128) {
+					length = this.read(UINT8);
+				} else if (this.buffer[this.offset] < 192) {
+					length = this.read(UINT16) - 32768;
+				} else {
+					length = this.read(UINT32) - 3221225472;
+				}
+
+				data = this.buffer.toString(this.strEncoding, this.offset, this.offset + length);
+				
 				this.offset += length;
+
 				break;
 
 			case UNKNOWN:
@@ -92,18 +107,8 @@ export default class BufferReader {
 		return data;
 	}
 
-	readVariableUint() {
-		if (this.buffer[this.offset] < 128) {
-			return this.read(UINT8);
-		} else if (this.buffer[this.offset] < 192) {
-			return this.read(UINT16) - 32768;
-		} else {
-			return this.read(UINT32) - 3221225472;
-		}
-	}
-
 	readFixedLengthString(length) {
-		let data = this.buffer.toString('utf-8', this.offset, this.offset + length);
+		let data = this.buffer.toString(this.strEncoding, this.offset, this.offset + length);
 		this.offset += length;
 		return data;
 	}

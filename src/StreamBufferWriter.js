@@ -29,7 +29,7 @@ export default class StreamBufferWriter extends BufferWriter {
 	}
 
 	checkSize(size) {
-		while (this.offset + size > this.size) {
+		if (this.offset + size > this.size) {
 			if (this.streamReady && !this.flush()) {
 				this.grow();
 			} else {
