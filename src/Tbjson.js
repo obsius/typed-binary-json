@@ -126,6 +126,13 @@ export default class Tbjson {
 	 * @param { obj } def - the definition to set to
 	 */
 	registerVariableDef(id, def) {
+
+		// format the definition
+		def = def ? this.fmtDef(def) : null;
+		if (def == ERROR) {
+			throw new Error(`Invalid definition for variable: ${id}`);
+		}
+
 		this.variableDefs[id] = def;
 	}
 
@@ -735,6 +742,7 @@ export default class Tbjson {
 	 * @param { object | array | number } def - the definition specifying how to decode the binary data
 	 */
 	fmtDef(def) {
+
 		switch (typeof def) {
 
 			// already in number form, just return it

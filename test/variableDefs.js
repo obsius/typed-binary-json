@@ -5,6 +5,7 @@ export default function(Tbjson, stringify) {
 	class A {
 		int = 999;
 		string = 'string';
+		nullString = null;
 		array = [10, 10.0001, true, 'apple'];
 		object = {
 			float: 10.994,
@@ -23,11 +24,10 @@ export default function(Tbjson, stringify) {
 	tbjson.registerVariableDef('var1', {
 		int: Tbjson.TYPES.INT32,
 		string: Tbjson.TYPES.STRING,
+		nullString: [Tbjson.TYPES.NULLABLE, Tbjson.TYPES.STRING],
 		array: Tbjson.TYPES.ARRAY,
 		object: Tbjson.TYPES.OBJECT
 	});
-
-	tbjson.processVariableDefs();
 
 	return [
 		stringify(x),
