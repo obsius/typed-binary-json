@@ -27,6 +27,7 @@ export const UNKNOWN =                      15;
 
 // extras
 export const VARIABLE_DEF =                 16;
+export const INSTANCE =                     17;
 
 // primitive sizes			
 export const SIZE_NULL =                    1;

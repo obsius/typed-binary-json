@@ -23,6 +23,7 @@ import {
 	TYPED_ARRAY,
 	UNKNOWN,
 	VARIABLE_DEF,
+	INSTANCE,
 
 	SIZE_UINT32,
 	
@@ -751,8 +752,11 @@ export default class Tbjson {
 
 			// string referencing a prototype, add the string to the reference lookup table
 			case 'string':
-				if (this.protoRefs[def]) { return this.protoRefs[def]; }
-				this.protoRefs[def] = this.nextProtoCode++;
+
+				if (!this.protoRefs[def]) {
+					this.protoRefs[def] = this.nextProtoCode++;
+				}
+
 				return this.protoRefs[def];
 
 			// prototype (class)
@@ -801,6 +805,10 @@ export default class Tbjson {
 						// variable
 						} else if (def[0] == VARIABLE_DEF) {
 							return def;
+
+						// instance object
+						} else if (def[0] == INSTANCE) {
+							return OBJECT;
 						}
 
 					// fixed length array
@@ -950,7 +958,6 @@ export default class Tbjson {
 							obj = obj.constructor.tbjson.unbuild(obj);
 						}
 					}
-
 					
 					this.serializeDef(obj, this.protos[def].definition);
 
@@ -1115,10 +1122,13 @@ export default class Tbjson {
 					}
 
 					// simple object, traverse accordingly
+					
 					let ref = {};
+
 					for (let key in obj) {
 						ref[key] = this.serialize(obj[key]);
 					}
+
 					return ref;
 				}
 		}
@@ -1287,7 +1297,7 @@ export default class Tbjson {
 	}
 }
 
-Tbjson.TYPES = { NULL, BOOL, INT8, UINT8, INT16, UINT16, INT32, UINT32, FLOAT32, FLOAT64, STRING, ARRAY, OBJECT, NULLABLE, TYPED_ARRAY, UNKNOWN, VARIABLE_DEF };
+Tbjson.TYPES = { NULL, BOOL, INT8, UINT8, INT16, UINT16, INT32, UINT32, FLOAT32, FLOAT64, STRING, ARRAY, OBJECT, NULLABLE, TYPED_ARRAY, UNKNOWN, VARIABLE_DEF, INSTANCE };
 
 /**
  * Cast a plain object into the typed object it represents. Only supports prototype definitions, not strings.
@@ -1356,16 +1366,31 @@ Tbjson.cast = (obj, prototype, definitions = {}) => {
 				// variable def, won't know this when casting
 				case VARIABLE_DEF:
 					return obj;
+
+				// instance object
+				case INSTANCE:
+					return Tbjson.cast(obj, prototype[1], definitions);
 			}
 
 		// non-prototyped object
 		} else if (!obj || !obj.constructor || obj.constructor.prototype == Object.prototype) {
 
-			// prototype is tbjson with a definition
-			if (prototype.tbjson && prototype.tbjson.definition) {
+			let tbjson = prototype.tbjson;
 
-				let typedObj = new prototype();
+			// prototype is tbjson with a definition
+			if (tbjson && tbjson.definition) {
+
+				let typedObj;
 				let definition;
+
+				// call the cast function to instantiate the correct prototype
+				if (tbjson.cast) {
+					return Tbjson.cast(obj, tbjson.cast(obj), definitions);
+
+				// use the passed prototype
+				} else {
+					typedObj = new prototype();
+				}
 
 				if (isNonNullObject) {
 
@@ -1376,7 +1401,7 @@ Tbjson.cast = (obj, prototype, definitions = {}) => {
 					// check for parent
 					} else {
 
-						definition = prototype.tbjson.definition;
+						definition = tbjson.definition;
 
 						// only check for a parent if the definition is an object
 						if (typeof definition == 'object') {
@@ -1409,8 +1434,8 @@ Tbjson.cast = (obj, prototype, definitions = {}) => {
 				}
 
 				// call the build function for post construction
-				if (prototype.tbjson.build) {
-					prototype.tbjson.build(typedObj);
+				if (tbjson.build) {
+					tbjson.build(typedObj);
 				}
 
 				return typedObj;
@@ -1565,6 +1590,7 @@ Tbjson.clone = (obj, definitions = {}) => {
 
 				// generic clone function
 				} else {
+					
 					for (let key in definition) {
 						retObj[key] = Tbjson.clone(obj[key], definitions);
 					}
