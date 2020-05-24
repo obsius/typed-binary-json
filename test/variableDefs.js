@@ -41,7 +41,7 @@ export default function(Tbjson, stringify) {
 
 	tbjson.registerPrototype(C);
 
-	tbjson.registerPseduoPrototype('var1', {
+	tbjson.registerPseudoPrototype('var1', {
 		int: Tbjson.TYPES.INT32,
 		string: Tbjson.TYPES.STRING,
 		nullString: [Tbjson.TYPES.NULLABLE, Tbjson.TYPES.STRING],

@@ -138,12 +138,12 @@ export default class Tbjson {
 	}
 
 	/**
-	 * Register a pseduo prototype, rather a variable definition that should be treated as if it were a prototype (to support nullable, object, and array).
+	 * Register a pseudo prototype, rather a variable definition that should be treated as if it were a prototype (to support nullable, object, and array).
 	 * 
 	 * @param { number | string } id - the identifier of this pseduo prototype
 	 * @param { obj } def - the definition to set to
 	 */
-	registerPseduoPrototype(id, def) {
+	registerPseudoPrototype(id, def) {
 
 		let code = this.protoRefs[id];
 
