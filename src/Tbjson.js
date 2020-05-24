@@ -138,6 +138,36 @@ export default class Tbjson {
 	}
 
 	/**
+	 * Register a pseduo prototype, rather a variable definition that should be treated as if it were a prototype (to support nullable, object, and array).
+	 * 
+	 * @param { number | string } id - the identifier of this pseduo prototype
+	 * @param { obj } def - the definition to set to
+	 */
+	registerPseduoPrototype(id, def) {
+
+		let code = this.protoRefs[id];
+
+		// already registered
+		if (code && this.protos[this.protoRefs[id]]) {
+			return;
+		}
+
+		// format the definition
+		def = def ? this.fmtDef(def) : null;
+		if (def == ERROR) {
+			throw new Error(`Invalid definition for variable: ${id}`);
+		}
+
+		// set the code if not already set
+		if (!code) {
+			code = this.nextProtoCode++;
+			this.protoRefs[id] = code;
+		}
+
+		this.protos[code] = new Prototype(def);
+	}
+
+	/**
 	 * Register a prototype / class or plain objecct for serilization and deserialization.
 	 * If using Class.tbjson = { ... } you must call this for each class, and then call finalizePrototypes for inheritance to work.
 	 * 
@@ -166,6 +196,7 @@ export default class Tbjson {
 	 */
 	registerPrototype(prototype) {
 
+		// check if finalized
 		if (this.finalized) {
 			if (typeof prototype == 'function' && prototype.tbjson) {
 				return this.protoRefs[prototype.name];
@@ -742,7 +773,7 @@ export default class Tbjson {
 	 * 
 	 * @param { object | array | number } def - the definition specifying how to decode the binary data
 	 */
-	fmtDef(def) {
+	fmtDef(def, depth = 0) {
 
 		switch (typeof def) {
 
@@ -778,12 +809,12 @@ export default class Tbjson {
 
 						// array
 						if (def[0] == ARRAY) {
-							return this.offsets.array + this.fmtDef(def[1]);
+							return this.offsets.array + this.fmtDef(def[1], depth + 1);
 
 						// nullable
 						} else if (def[0] == NULLABLE) {
 
-							let subDef = this.fmtDef(def[1]);
+							let subDef = this.fmtDef(def[1], depth + 1);
 
 							// primitive
 							if (subDef < NULLABLE_OFFSET) {
@@ -796,14 +827,20 @@ export default class Tbjson {
 
 						// primitive typed array
 						} else if (def[0] == TYPED_ARRAY) {
-							return TYPED_ARRAY_OFFSET + this.fmtDef(def[1]);
+							return TYPED_ARRAY_OFFSET + this.fmtDef(def[1], depth + 1);
 
 						// object
 						} else if (def[0] == OBJECT) {
-							return this.offsets.object + this.fmtDef(def[1]);
+							return this.offsets.object + this.fmtDef(def[1], depth + 1);
 
-						// variable
+						// variable def
 						} else if (def[0] == VARIABLE_DEF) {
+							
+							// cannot be nested
+							if (depth) {
+								throw new Error(`A variable def cannot be nested, try using a pseudo prototype instead: "${def[1]}"`);
+							}
+
 							return def;
 
 						// instance object
@@ -817,7 +854,7 @@ export default class Tbjson {
 						let fmtDef = new Array(def.length);
 
 						for (let i = 0; i < def.length; ++i) {
-							fmtDef[i] = this.fmtDef(def[i]);
+							fmtDef[i] = this.fmtDef(def[i], depth + 1);
 						}
 
 						return fmtDef;
@@ -829,7 +866,7 @@ export default class Tbjson {
 					let fmtDef = {};
 
 					for (let key in def) {
-						fmtDef[key] = this.fmtDef(def[key]);
+						fmtDef[key] = this.fmtDef(def[key], depth + 1);
 					}
 
 					return fmtDef;
@@ -958,7 +995,7 @@ export default class Tbjson {
 							obj = obj.constructor.tbjson.unbuild(obj);
 						}
 					}
-					
+
 					this.serializeDef(obj, this.protos[def].definition);
 
 				// variable-length fixed typed array 

@@ -12,14 +12,42 @@ export default function(Tbjson, stringify) {
 			bool: false
 		}
 	}
-
 	A.tbjson = {
 		definition: [Tbjson.TYPES.VARIABLE_DEF, 'var1']
 	};
 
-	let x  = new A();
+	class B {
+		var1 = null;
+	}
+	B.tbjson = {
+		definition: {
+			var1: [Tbjson.TYPES.NULLABLE, 'var1']
+		}
+	};
 
-	tbjson.registerPrototype(A);
+	class C {
+		a = new A();
+		b = new B();
+	}
+
+	C.tbjson = {
+		definition: {
+			a: A,
+			b: B
+		}
+	};
+
+	let x  = new C();
+
+	tbjson.registerPrototype(C);
+
+	tbjson.registerPseduoPrototype('var1', {
+		int: Tbjson.TYPES.INT32,
+		string: Tbjson.TYPES.STRING,
+		nullString: [Tbjson.TYPES.NULLABLE, Tbjson.TYPES.STRING],
+		array: Tbjson.TYPES.ARRAY,
+		object: Tbjson.TYPES.OBJECT
+	});
 
 	tbjson.registerVariableDef('var1', {
 		int: Tbjson.TYPES.INT32,

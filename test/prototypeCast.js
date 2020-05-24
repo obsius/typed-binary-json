@@ -38,7 +38,7 @@ export default function(Tbjson, stringify, validateTypes) {
 		definition: {
 			item: [Tbjson.TYPES.INSTANCE, Item],
 			itemsArray: [Tbjson.TYPES.ARRAY, [Tbjson.TYPES.INSTANCE, Item]],
-			itemsObject: [Tbjson.TYPES.INSTANCE_OBJECT, [Tbjson.TYPES.INSTANCE, Item]]
+			itemsObject: [Tbjson.TYPES.OBJECT, [Tbjson.TYPES.INSTANCE, Item]]
 		}
 	};
 
