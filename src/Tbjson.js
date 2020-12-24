@@ -52,6 +52,8 @@ import BufferReader from './BufferReader';
 import StreamBufferWriter from './StreamBufferWriter';
 import StreamBufferReader from './StreamBufferReader';
 
+// TODO : 10/2020 : support nested objects
+
 /**
  * Tbjson
  * 
