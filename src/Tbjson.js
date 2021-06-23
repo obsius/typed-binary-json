@@ -775,7 +775,7 @@ export default class Tbjson {
 	 * 
 	 * @param { object | array | number } def - the definition specifying how to decode the binary data
 	 */
-	fmtDef(def, depth = 0) {
+	fmtDef(def, depth = 0, insideOf = 0) {
 
 		switch (typeof def) {
 
@@ -807,16 +807,16 @@ export default class Tbjson {
 				} else if (Array.isArray(def)) {
 
 					// typed array
-					if (def.length == 2 && typeof def[0] == 'number') {
+					if (def.length == 2 && typeof def[0] == 'number' && def[0] > 10) {
 
 						// array
 						if (def[0] == ARRAY) {
-							return this.offsets.array + this.fmtDef(def[1], depth + 1);
+							return this.offsets.array + this.fmtDef(def[1], depth + 1, ARRAY);
 
 						// nullable
 						} else if (def[0] == NULLABLE) {
 
-							let subDef = this.fmtDef(def[1], depth + 1);
+							let subDef = this.fmtDef(def[1], depth + 1, NULLABLE);
 
 							// primitive
 							if (subDef < NULLABLE_OFFSET) {
@@ -829,11 +829,11 @@ export default class Tbjson {
 
 						// primitive typed array
 						} else if (def[0] == TYPED_ARRAY) {
-							return TYPED_ARRAY_OFFSET + this.fmtDef(def[1], depth + 1);
+							return TYPED_ARRAY_OFFSET + this.fmtDef(def[1], depth + 1, TYPED_ARRAY);
 
 						// object
 						} else if (def[0] == OBJECT) {
-							return this.offsets.object + this.fmtDef(def[1], depth + 1);
+							return this.offsets.object + this.fmtDef(def[1], depth + 1, OBJECT);
 
 						// variable def
 						} else if (def[0] == VARIABLE_DEF) {
@@ -848,6 +848,10 @@ export default class Tbjson {
 						// instance object
 						} else if (def[0] == INSTANCE) {
 							return OBJECT;
+
+						// TODO : ERROR
+						} else {
+
 						}
 
 					// fixed length array
@@ -859,7 +863,18 @@ export default class Tbjson {
 							fmtDef[i] = this.fmtDef(def[i], depth + 1);
 						}
 
-						return fmtDef;
+						// inside of an array or object, register def and return matching code
+						if (insideOf == ARRAY || insideOf == OBJECT) {
+
+							let code = this.nextProtoCode++;
+							this.protos[code] = new Prototype(fmtDef);
+
+							return code;
+
+						// just return the def
+						} else {
+							return fmtDef;
+						}
 					}
 
 				// simple object

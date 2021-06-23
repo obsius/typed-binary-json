@@ -5,6 +5,7 @@ import clone from './clone';
 import definition from './definition';
 import inheritance from './inheritance';
 import nested from './nested';
+import nestedDefinition from './nestedDefinition';
 import nulls from './nulls';
 import nullable from './nullable';
 import plain from './plain.js';
@@ -62,6 +63,7 @@ function run() {
 	runTest('Definition', definition);
 	runTest('Inheritance', inheritance);
 	runTest('Nested', nested);
+	runTest('Nested Definition', nestedDefinition);
 	runTest('Nulls', nulls);
 	runTest('Nullable', nullable);
 	runTest('Plain', plain);
