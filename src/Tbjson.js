@@ -1358,8 +1358,9 @@ Tbjson.TYPES = { NULL, BOOL, INT8, UINT8, INT16, UINT16, INT32, UINT32, FLOAT32,
  * 
  * @param { string } obj - object to parse
  * @param { function } prototype - prototype to cast into
+ * @param { bool } free - set obj properties to undefined as the obj is cast (slower, but frees up memory)
  */
-Tbjson.cast = (obj, prototype, definitions = {}) => {
+Tbjson.cast = (obj, prototype, free = false, definitions = {}) => {
 
 	// plain object or array with a definition (ignore prototyped)
 	if (prototype && (typeof prototype =='function' || typeof prototype =='object')) {
@@ -1380,7 +1381,8 @@ Tbjson.cast = (obj, prototype, definitions = {}) => {
 				typedObj = new Array(obj.length);
 
 				for (let i = 0; i < obj.length; ++i) {
-					typedObj[i] = Tbjson.cast(obj[i], prototype[1], definitions);
+					typedObj[i] = Tbjson.cast(obj[i], prototype[1], free, definitions);
+					if (free) { obj[i] = undefined; }
 				}
 				
 			// unknown array
@@ -1389,7 +1391,8 @@ Tbjson.cast = (obj, prototype, definitions = {}) => {
 				typedObj = new Array(prototype.length);
 
 				for (let i = 0; i < prototype.length; ++i) {
-					typedObj[i] = Tbjson.cast(obj[i], prototype[i], definitions);
+					typedObj[i] = Tbjson.cast(obj[i], prototype[i], free, definitions);
+					if (free) { obj[i] = undefined; }
 				}
 			}
 
@@ -1407,7 +1410,8 @@ Tbjson.cast = (obj, prototype, definitions = {}) => {
 
 					if (isNonNullObject) {
 						for (let key in obj) {
-							typedObj[key] = Tbjson.cast(obj[key], prototype[1], definitions);
+							typedObj[key] = Tbjson.cast(obj[key], prototype[1], free, definitions);
+							if (free) { obj[key] = undefined; }
 						}
 					}
 
@@ -1415,7 +1419,7 @@ Tbjson.cast = (obj, prototype, definitions = {}) => {
 
 				// nullable object
 				case NULLABLE:
-					return obj == null ? null : Tbjson.cast(obj, prototype[1], definitions);
+					return obj == null ? null : Tbjson.cast(obj, prototype[1], free, definitions);
 			
 				// variable def, won't know this when casting
 				case VARIABLE_DEF:
@@ -1423,7 +1427,7 @@ Tbjson.cast = (obj, prototype, definitions = {}) => {
 
 				// instance object
 				case INSTANCE:
-					return Tbjson.cast(obj, prototype[1], definitions);
+					return Tbjson.cast(obj, prototype[1], free, definitions);
 			}
 
 		// non-prototyped object
@@ -1439,7 +1443,7 @@ Tbjson.cast = (obj, prototype, definitions = {}) => {
 
 				// call the cast function to instantiate the correct prototype
 				if (tbjson.cast) {
-					return Tbjson.cast(obj, tbjson.cast(obj), definitions);
+					return Tbjson.cast(obj, tbjson.cast(obj), free, definitions);
 
 				// use the passed prototype
 				} else {
@@ -1474,6 +1478,7 @@ Tbjson.cast = (obj, prototype, definitions = {}) => {
 						for (let key in typedObj) {
 							if (key in obj) {
 								typedObj[key] = obj[key];
+								if (free) { obj[key] = undefined; }
 							}
 						}
 
@@ -1481,7 +1486,8 @@ Tbjson.cast = (obj, prototype, definitions = {}) => {
 					} else {
 						for (let key in definition) {
 							if (key in obj) {
-								typedObj[key] = Tbjson.cast(obj[key], definition[key], definitions);
+								typedObj[key] = Tbjson.cast(obj[key], definition[key], free, definitions);
+								if (free) { obj[key] = undefined; }
 							}
 						}
 					}
@@ -1502,7 +1508,8 @@ Tbjson.cast = (obj, prototype, definitions = {}) => {
 				if (isNonNullObject) {
 					for (let key in prototype) {
 						if (key in obj) {
-							typedObj[key] = Tbjson.cast(obj[key], prototype[key], definitions);
+							typedObj[key] = Tbjson.cast(obj[key], prototype[key], free, definitions);
+							if (free) { obj[key] = undefined; }
 						}
 					}
 				}
