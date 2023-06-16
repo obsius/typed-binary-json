@@ -1533,13 +1533,24 @@ Tbjson.serialize = (obj, definitions = {}) => {
 	// object or array
 	if (obj && typeof obj == 'object') {
 
-		// array or typed array
-		if (Array.isArray(obj) || ArrayBuffer.isView(obj)) {
+		// array
+		if (Array.isArray(obj)) {
 
 			let retObj = new Array(obj.length);
 
 			for (let i = 0; i < obj.length; ++i) {
 				retObj[i] = Tbjson.serialize(obj[i], definitions);
+			}
+
+			return retObj;
+
+		// typed array (no need to check elements as they must all be primitives)
+		} else if (ArrayBuffer.isView(obj)) {
+
+			let retObj = new Array(obj.length);
+
+			for (let i = 0; i < obj.length; ++i) {
+				retObj[i] = obj[i];
 			}
 
 			return retObj;
@@ -1614,6 +1625,11 @@ Tbjson.clone = (obj, definitions = {}) => {
 			}
 
 			return retObj;
+
+		// typed array
+		} else if (ArrayBuffer.isView(obj)) {
+
+			return obj.slice();
 
 		// object
 		} else {
