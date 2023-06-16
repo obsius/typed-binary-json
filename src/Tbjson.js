@@ -1533,8 +1533,8 @@ Tbjson.serialize = (obj, definitions = {}) => {
 	// object or array
 	if (obj && typeof obj == 'object') {
 
-		// array
-		if (Array.isArray(obj)) {
+		// array or typed array
+		if (Array.isArray(obj) || ArrayBuffer.isView(obj)) {
 
 			let retObj = new Array(obj.length);
 
