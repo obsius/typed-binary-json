@@ -2,6 +2,8 @@
 export const MAGIC_NUMBER =                 '.tbj';
 export const SIZE_MAGIC_NUMBER =            4;
 
+export const VERSION =                      1;
+
 // error
 export const ERROR =                        -1;
 

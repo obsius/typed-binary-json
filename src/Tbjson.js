@@ -3,7 +3,7 @@ import fs from 'fs';
 import {
 	MAGIC_NUMBER,
 	SIZE_MAGIC_NUMBER,
-	
+	VERSION,
 	ERROR,
 
 	NULL,
@@ -60,6 +60,8 @@ import StreamBufferReader from './StreamBufferReader';
  * A JS TBJSON serializer and parser.
  */
 export default class Tbjson {
+
+	version = VERSION;
 
 	// TODO: for registered types (primitives)
 	typeRefs = {};
@@ -602,6 +604,7 @@ export default class Tbjson {
 		}
 
 		return {
+			version: VERSION,
 			offsets: this.offsets,
 			typeRefs: this.typeRefs,
 			typeDefs: typeDefs,
@@ -652,6 +655,8 @@ export default class Tbjson {
 		try {
 
 			let header = JSON.parse(headerStr);
+
+			this.version = header.version || 0;
 
 			// types
 			this.typeRefs = header.typeRefs;
@@ -1265,7 +1270,14 @@ export default class Tbjson {
 
 				// non null
 				if (this.reader.read(UINT8)) {
-					return this.parse(def - NULLABLE_OFFSET);
+
+					// support older versions
+					if (this.version < 1) {
+						return this.reader.read(def - NULLABLE_OFFSET);
+					} else {
+						return this.parse(def - NULLABLE_OFFSET);
+					}
+
 				// null
 				} else {
 					return null;
