@@ -17,7 +17,7 @@ export const INT32 =                        7;
 export const FLOAT32 =                      8;
 export const FLOAT64 =                      9;
 
-// higher-order types			
+// higher-order types
 export const STRING =                       10;
 export const ARRAY =                        11;
 export const OBJECT =                       12;
@@ -29,7 +29,7 @@ export const UNKNOWN =                      15;
 export const VARIABLE_DEF =                 16;
 export const INSTANCE =                     17;
 
-// primitive sizes			
+// primitive sizes
 export const SIZE_NULL =                    1;
 export const SIZE_BOOL =                    1;
 export const SIZE_INT8 =                    1;

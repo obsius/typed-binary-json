@@ -1,6 +1,6 @@
 {
 	"name": "typed-binary-json",
-	"version": "1.19.3",
+	"version": "1.19.4",
 	"description": "A TBJSON parser and serializer.",
 	"homepage": "https://github.com/obsius/typed-binary-json",
 	"author": "Jeff Seaman <mr.jeffrey.seaman@gmail.com> (https://www.ngc6822.com)",
@@ -16,13 +16,13 @@
 		"test": "babel-node test"
 	},
 	"devDependencies": {
-		"@babel/core": "^7.22.5",
-		"@babel/node": "^7.22.5",
+		"@babel/core": "^7.24.9",
+		"@babel/node": "^7.24.8",
 		"@babel/plugin-proposal-class-properties": "^7.18.6",
-		"@babel/preset-env": "^7.22.5",
-		"@rollup/plugin-babel": "^6.0.3",
-		"nodemon": "^2.0.22",
-		"rollup": "^3.25.1"
+		"@babel/preset-env": "^7.24.8",
+		"@rollup/plugin-babel": "^6.0.4",
+		"nodemon": "^3.1.4",
+		"rollup": "^4.19.0"
 	},
 	"babel": {
 		"plugins": [

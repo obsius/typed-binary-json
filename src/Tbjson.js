@@ -961,13 +961,14 @@ export default class Tbjson {
 						this.writer.write(def, obj);
 					}
 
-				// nullable primitive
+				// nullable primitive or higher-order type
 				} else if (def < TYPED_ARRAY_OFFSET) {
+
 					if (obj == null) {
 						this.writer.write(UINT8, 0);
 					} else {
 						this.writer.write(UINT8, 1);
-						this.writer.write(def - NULLABLE_OFFSET, obj);
+						this.serializeDef(obj, def - NULLABLE_OFFSET);
 					}
 
 				// primitive typed array
@@ -1259,12 +1260,12 @@ export default class Tbjson {
 					return this.reader.read(def);
 				}
 
-			// nullable primitive
+			// nullable primitive or higher-order type
 			} else if (def < TYPED_ARRAY_OFFSET) {
 
 				// non null
 				if (this.reader.read(UINT8)) {
-					return this.reader.read(def - NULLABLE_OFFSET);
+					return this.parse(def - NULLABLE_OFFSET);
 				// null
 				} else {
 					return null;
