@@ -1369,14 +1369,14 @@ Tbjson.TYPES = { NULL, BOOL, INT8, UINT8, INT16, UINT16, INT32, UINT32, FLOAT32,
 /**
  * Cast a plain object into the typed object it represents. Only supports prototype definitions, not strings.
  * 
- * @param { string } obj - object to parse
+ * @param { object } obj - object to parse
  * @param { function } prototype - prototype to cast into
  * @param { bool } free - set obj properties to undefined as the obj is cast (slower, but frees up memory)
  */
 Tbjson.cast = (obj, prototype, free = false, definitions = {}) => {
 
 	// plain object or array with a definition (ignore prototyped)
-	if (prototype && (typeof prototype =='function' || typeof prototype =='object')) {
+	if (prototype && (typeof prototype == 'function' || typeof prototype == 'object')) {
 
 		let isNonNullObject = typeof obj == 'object' && obj;
 
@@ -1534,6 +1534,161 @@ Tbjson.cast = (obj, prototype, free = false, definitions = {}) => {
 
 	// primitive, untyped, or prototyped
 	return obj;
+}
+
+/**
+ * Check a prototype instance (or plain object with specified proto) for invalid fields using the TBJSON definition when available.
+ * 
+ * @param { object } obj - object to check
+ * @param { function } prototype - prototype to to treat object as
+ * @param { bool } returnOnFirstError - only return the first error
+ */
+Tbjson.validate = (obj, prototype = null, returnOnFirstError = false, path = [], definitions = {}) => {
+
+	let errors = [];
+
+	// validate type
+	if (typeof prototype == 'number') {
+
+		if (!validTypedValue(obj, prototype)) {
+			errors.push([path, prototype]);
+		}
+
+	// compound or recursive check
+	} else {
+
+		let isNonNullObject = typeof obj == 'object' && obj;
+
+		let isArray = Array.isArray(prototype);
+		let isArrayTypeDef = Array.isArray(prototype) && prototype.length == 2;
+
+		// array
+		if (Array.isArray(obj) && isArray) {
+
+			// typed array
+			if (isArrayTypeDef && prototype[0] == ARRAY) {
+
+				for (let i = 0; i < obj.length; ++i) {
+
+					errors.push(...Tbjson.validate(obj[i], prototype[1], returnOnFirstError, path.concat(i), definitions));
+
+					if (returnOnFirstError && errors.length) {
+						break;
+					}
+				}
+				
+			// unknown array
+			} else {
+
+				for (let i = 0; i < prototype.length; ++i) {
+
+					errors.push(...Tbjson.validate(obj[i], prototype[i], returnOnFirstError, path.concat(i), definitions));
+
+					if (returnOnFirstError && errors.length) {
+						break;
+					}
+				}
+			}
+
+		// qualified type
+		} else if (isArrayTypeDef) {
+
+			switch (prototype[0]) {
+
+				// uniform value object
+				case OBJECT:
+
+					if (isNonNullObject) {
+						for (let key in obj) {
+
+							errors.push(...Tbjson.validate(obj[key], prototype[1], returnOnFirstError, path.concat(key), definitions));
+
+							if (returnOnFirstError && errors.length) {
+								break;
+							}
+						}
+					} else {
+						errors.push([path, OBJECT]);
+					}
+
+					break;
+
+				// nullable object
+				case NULLABLE:
+
+					if (obj != null) {
+						errors.push(...Tbjson.validate(obj, prototype[1], returnOnFirstError, path.slice(), definitions));
+					}
+
+					break;
+
+				// instance object
+				case INSTANCE:
+					errors.push(...Tbjson.validate(obj, prototype[1], returnOnFirstError, path.slice(), definitions));
+			}
+
+		// object
+		} else if (obj) {
+
+			let definition;
+
+			if (!prototype) {
+				prototype = obj.constructor;
+			}
+
+			// prototype is tbjson with a definition
+			if (typeof prototype == 'function' && prototype.tbjson) {
+
+				// call the validate function for custom enforcement
+				if (prototype.tbjson.validate) {
+					errors.push(...tbjson.validate(obj, returnOnFirstError, path.slice()));
+
+				// use the passed prototype
+				} else {
+
+					// use map
+					if (definitions[prototype.name]) {
+						definition = definitions[prototype.name];
+
+					// check for parent
+					} else {
+
+						definition = prototype.tbjson.definition;
+
+						// only check for a parent if the definition is an object
+						if (typeof definition == 'object') {
+
+							for (let parent = prototype; parent = getParent(parent);) {
+								if (!parent.tbjson || !parent.tbjson.definition) { break; }
+								definition = Object.assign({}, parent.tbjson.definition, definition);
+							}
+
+							definitions[prototype.name] = definition;
+						}
+					}
+				}
+
+			// only a definition
+			} else {
+				definition = prototype;
+			}
+
+			if (definition) {
+				for (let key in definition) {
+					if (key in obj) {
+
+						errors.push(...Tbjson.validate(obj[key], definition[key], returnOnFirstError, path.concat(key), definitions));
+
+						if (returnOnFirstError && errors.length) {
+							break;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return errors;
 }
 
 /**
@@ -1738,4 +1893,54 @@ Tbjson.definition = (obj) => {
 function getParent(prototype) {
 	let parent = prototype ? Object.getPrototypeOf(prototype) : null;
 	return (parent && parent.name) ? parent : null;
+}
+
+/**
+ * Check if a value conforms to a primitive type.
+ * 
+ * @param { * } val - value to check
+ * @param { number } type - the tbjson primitive type
+ */
+function validTypedValue(val, type) {
+	switch (type) {
+
+		case NULL:
+			return val == null;
+
+		case BOOL:
+			return typeof val == 'boolean' || val === 0 || val === 1;
+
+		case INT8:
+			return typeof val == 'number' && !Number.isNaN(val) && val >= -128 && val <= 127;
+
+		case UINT8:
+			return typeof val == 'number' && !Number.isNaN(val) && val >= 0 && val <= 255;
+
+		case INT16:
+			return typeof val == 'number' && !Number.isNaN(val) && val >= -32768  && val <= 32767;
+
+		case UINT16:
+			return typeof val == 'number' && !Number.isNaN(val) && val >= 0 && val <= 65535;
+
+		case INT32:
+			return typeof val == 'number' && !Number.isNaN(val) && val >= -2147483648 && val < 2147483647;
+
+		case UINT32:
+			return typeof val == 'number' && !Number.isNaN(val) && val >= 0 && val <= 4294967295;
+
+		case FLOAT32:
+		case FLOAT64:
+			return typeof val == 'number' && !Number.isNaN(val);
+
+		case STRING:
+			return typeof val == 'string';
+
+		case ARRAY:
+			return Array.isArray(val);
+
+		case OBJECT:
+			return typeof val == 'object' && val != null;
+	}
+
+	return true;
 }

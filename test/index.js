@@ -19,6 +19,7 @@ import typed from './typed.js';
 import typedArray from './typedArray';
 import typedSelection from './typedSelection';
 import unbuild from './unbuild';
+import validate from './validate';
 import variableDefs from './variableDefs';
 
 function stringify(val) {
@@ -77,6 +78,7 @@ function run() {
 	runTest('Typed Array', typedArray);
 	runTest('Typed Selection', typedSelection);
 	runTest('Unbuild', unbuild);
+	runTest('Validate', validate);
 	runTest('Variable Definitions', variableDefs);
 }
 
