@@ -1541,16 +1541,16 @@ Tbjson.cast = (obj, prototype, free = false, definitions = {}) => {
  * 
  * @param { object } obj - object to check
  * @param { function } prototype - prototype to to treat object as
- * @param { bool } returnOnFirstError - only return the first error
+ * @param { object } options - options
  */
-Tbjson.validate = (obj, prototype = null, returnOnFirstError = false, path = [], definitions = {}) => {
+Tbjson.validate = (obj, prototype = null, options = {}, path = [], definitions = {}) => {
 
 	let errors = [];
 
 	// validate type
 	if (typeof prototype == 'number') {
 
-		if (!validTypedValue(obj, prototype)) {
+		if (!validTypedValue(obj, prototype, options)) {
 			errors.push([path, prototype]);
 		}
 
@@ -1570,9 +1570,9 @@ Tbjson.validate = (obj, prototype = null, returnOnFirstError = false, path = [],
 
 				for (let i = 0; i < obj.length; ++i) {
 
-					errors.push(...Tbjson.validate(obj[i], prototype[1], returnOnFirstError, path.concat(i), definitions));
+					errors.push(...Tbjson.validate(obj[i], prototype[1], options, path.concat(i), definitions));
 
-					if (returnOnFirstError && errors.length) {
+					if (options.returnOnFirstError && errors.length) {
 						break;
 					}
 				}
@@ -1582,9 +1582,9 @@ Tbjson.validate = (obj, prototype = null, returnOnFirstError = false, path = [],
 
 				for (let i = 0; i < prototype.length; ++i) {
 
-					errors.push(...Tbjson.validate(obj[i], prototype[i], returnOnFirstError, path.concat(i), definitions));
+					errors.push(...Tbjson.validate(obj[i], prototype[i], options, path.concat(i), definitions));
 
-					if (returnOnFirstError && errors.length) {
+					if (options.returnOnFirstError && errors.length) {
 						break;
 					}
 				}
@@ -1601,9 +1601,9 @@ Tbjson.validate = (obj, prototype = null, returnOnFirstError = false, path = [],
 					if (isNonNullObject) {
 						for (let key in obj) {
 
-							errors.push(...Tbjson.validate(obj[key], prototype[1], returnOnFirstError, path.concat(key), definitions));
+							errors.push(...Tbjson.validate(obj[key], prototype[1], options, path.concat(key), definitions));
 
-							if (returnOnFirstError && errors.length) {
+							if (options.returnOnFirstError && errors.length) {
 								break;
 							}
 						}
@@ -1617,14 +1617,14 @@ Tbjson.validate = (obj, prototype = null, returnOnFirstError = false, path = [],
 				case NULLABLE:
 
 					if (obj != null) {
-						errors.push(...Tbjson.validate(obj, prototype[1], returnOnFirstError, path.slice(), definitions));
+						errors.push(...Tbjson.validate(obj, prototype[1], options, path.slice(), definitions));
 					}
 
 					break;
 
 				// instance object
 				case INSTANCE:
-					errors.push(...Tbjson.validate(obj, prototype[1], returnOnFirstError, path.slice(), definitions));
+					errors.push(...Tbjson.validate(obj, prototype[1], options, path.slice(), definitions));
 			}
 
 		// object
@@ -1641,7 +1641,7 @@ Tbjson.validate = (obj, prototype = null, returnOnFirstError = false, path = [],
 
 				// call the validate function for custom enforcement
 				if (prototype.tbjson.validate) {
-					errors.push(...tbjson.validate(obj, returnOnFirstError, path.slice()));
+					errors.push(...tbjson.validate(obj, options));
 
 				// use the passed prototype
 				} else {
@@ -1677,9 +1677,9 @@ Tbjson.validate = (obj, prototype = null, returnOnFirstError = false, path = [],
 				for (let key in definition) {
 					if (key in obj) {
 
-						errors.push(...Tbjson.validate(obj[key], definition[key], returnOnFirstError, path.concat(key), definitions));
+						errors.push(...Tbjson.validate(obj[key], definition[key], options, path.concat(key), definitions));
 
-						if (returnOnFirstError && errors.length) {
+						if (options.returnOnFirstError && errors.length) {
 							break;
 						}
 					}
@@ -1900,8 +1900,9 @@ function getParent(prototype) {
  * 
  * @param { * } val - value to check
  * @param { number } type - the tbjson primitive type
+ * @param { object } options - options
  */
-function validTypedValue(val, type) {
+function validTypedValue(val, type, options = {}) {
 	switch (type) {
 
 		case NULL:
@@ -1911,29 +1912,29 @@ function validTypedValue(val, type) {
 			return typeof val == 'boolean' || val === 0 || val === 1;
 
 		case INT8:
-			return typeof val == 'number' && !Number.isNaN(val) && val >= -128 && val <= 127;
+			return typeof val == 'number' && (Number.isNaN(val) ? !!options.allowNaN : val >= -128 && val <= 127);
 
 		case UINT8:
-			return typeof val == 'number' && !Number.isNaN(val) && val >= 0 && val <= 255;
+			return typeof val == 'number' && (Number.isNaN(val) ? !!options.allowNaN : val >= 0 && val <= 255);
 
 		case INT16:
-			return typeof val == 'number' && !Number.isNaN(val) && val >= -32768  && val <= 32767;
+			return typeof val == 'number' && (Number.isNaN(val) ? !!options.allowNaN : val >= -32768  && val <= 32767);
 
 		case UINT16:
-			return typeof val == 'number' && !Number.isNaN(val) && val >= 0 && val <= 65535;
+			return typeof val == 'number' && (Number.isNaN(val) ? !!options.allowNaN : val >= 0 && val <= 65535);
 
 		case INT32:
-			return typeof val == 'number' && !Number.isNaN(val) && val >= -2147483648 && val < 2147483647;
+			return typeof val == 'number' && (Number.isNaN(val) ? !!options.allowNaN : val >= -2147483648 && val < 2147483647);
 
 		case UINT32:
-			return typeof val == 'number' && !Number.isNaN(val) && val >= 0 && val <= 4294967295;
+			return typeof val == 'number' && (Number.isNaN(val) ? !!options.allowNaN : val >= 0 && val <= 4294967295);
 
 		case FLOAT32:
 		case FLOAT64:
-			return typeof val == 'number' && !Number.isNaN(val);
+			return typeof val == 'number' && (!!options.allowNaN || !Number.isNaN(val));
 
 		case STRING:
-			return typeof val == 'string';
+			return typeof val == 'string' || (!!options.allowNullString && val == null);
 
 		case ARRAY:
 			return Array.isArray(val);
