@@ -21,7 +21,7 @@ Each file starts off with `.tbj` to singinify that it is a `Typed Binary JSON` f
 ```
 
 Offset | Value  | Meaning
--      | -      | -
+---    | ---    | ---
 0      | .tbj   | States the file type.
 4      | uint32 | Size of the JSON header.
 8      | JSON   | A utf-8 serialized JSON map of the binary data to follow.
@@ -32,7 +32,7 @@ x      | binary | The binary data. Always the next byte after the last header by
 The header contains information necessary to parse the binary data. It is raw `JSON` and makes it easy to peak at the file and see how the data is structured.
 
 Entry     | Meaning
--         | -
+---       | ---
 typeRefs  | A map that translates known type names to their codes.
 types     | Custom primitive types that have been defined for this serialization.
 protoRefs | A map that translates known class and object names (either passed in or the object's constructor name) to their codes.
@@ -45,7 +45,7 @@ root      | The object that was serialized. Contains the definition needed to de
 The types used by TBJSON.
 
 Type          | Code | Definition
--             | -    | -
+---           | ---  | ---
 Primitives    | -    | -
 NULL          | 0    | Null value.
 BOOL          | 1    | Boolean.
@@ -453,7 +453,7 @@ Performance varies on the data type, but you'll get best performance if your typ
 ```
 
 Benchmark    | Filesize | Time
--            | -        | -
+---          | ---      | ---
 JSON Write   | 140 MB   | 2,648 ms
 TBJSON Write | 37 MB    | 1,154 ms
 JSON Read    | N/A      | 2,073 ms
