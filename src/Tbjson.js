@@ -1598,6 +1598,7 @@ Tbjson.validate = (obj, prototype = null, options = {}, path = [], definitions =
 				// uniform value object
 				case OBJECT:
 
+					// cannot be null
 					if (isNonNullObject) {
 						for (let key in obj) {
 
@@ -1607,6 +1608,8 @@ Tbjson.validate = (obj, prototype = null, options = {}, path = [], definitions =
 								break;
 							}
 						}
+
+					// a null object must be marked nullable
 					} else {
 						errors.push([path, OBJECT]);
 					}
@@ -1616,8 +1619,13 @@ Tbjson.validate = (obj, prototype = null, options = {}, path = [], definitions =
 				// nullable object
 				case NULLABLE:
 
+					// ignore if null
 					if (obj != null) {
-						errors.push(...Tbjson.validate(obj, prototype[1], options, path.slice(), definitions));
+
+						// ignore nullable nan
+						if (!(options.allowNullableNaN && typeof prototype[1] == 'number' && prototype[1] >= UINT8 && prototype[1] <= FLOAT64 && Number.isNaN(obj))) {
+							errors.push(...Tbjson.validate(obj, prototype[1], options, path.slice(), definitions));
+						}
 					}
 
 					break;
