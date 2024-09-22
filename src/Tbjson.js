@@ -1543,9 +1543,7 @@ Tbjson.cast = (obj, prototype, free = false, definitions = {}) => {
  * @param { function } prototype - prototype to to treat object as
  * @param { object } options - options
  */
-Tbjson.validate = (obj, prototype = null, options = {}, path = [], definitions = {}) => {
-
-	let errors = [];
+Tbjson.validate = (obj, prototype = null, options = {}, definitions = {}, path = [], errors = []) => {
 
 	// validate type
 	if (typeof prototype == 'number') {
@@ -1570,9 +1568,9 @@ Tbjson.validate = (obj, prototype = null, options = {}, path = [], definitions =
 
 				for (let i = 0; i < obj.length; ++i) {
 
-					errors.push(...Tbjson.validate(obj[i], prototype[1], options, path.concat(i), definitions));
+					Tbjson.validate(obj[i], prototype[1], options, definitions, path.concat(i), errors);
 
-					if (options.returnOnFirstError && errors.length) {
+					if (options.returnOnNthError && errors.length >= options.returnOnNthError) {
 						break;
 					}
 				}
@@ -1582,9 +1580,9 @@ Tbjson.validate = (obj, prototype = null, options = {}, path = [], definitions =
 
 				for (let i = 0; i < prototype.length; ++i) {
 
-					errors.push(...Tbjson.validate(obj[i], prototype[i], options, path.concat(i), definitions));
+					Tbjson.validate(obj[i], prototype[i], options, definitions, path.concat(i), errors);
 
-					if (options.returnOnFirstError && errors.length) {
+					if (options.returnOnNthError && errors.length >= options.returnOnNthError) {
 						break;
 					}
 				}
@@ -1602,9 +1600,9 @@ Tbjson.validate = (obj, prototype = null, options = {}, path = [], definitions =
 					if (isNonNullObject) {
 						for (let key in obj) {
 
-							errors.push(...Tbjson.validate(obj[key], prototype[1], options, path.concat(key), definitions));
+							Tbjson.validate(obj[key], prototype[1], options, definitions, path.concat(key), errors);
 
-							if (options.returnOnFirstError && errors.length) {
+							if (options.returnOnNthError && errors.length >= options.returnOnNthError) {
 								break;
 							}
 						}
@@ -1624,7 +1622,7 @@ Tbjson.validate = (obj, prototype = null, options = {}, path = [], definitions =
 
 						// ignore nullable nan
 						if (!(options.allowNullableNaN && typeof prototype[1] == 'number' && prototype[1] >= UINT8 && prototype[1] <= FLOAT64 && Number.isNaN(obj))) {
-							errors.push(...Tbjson.validate(obj, prototype[1], options, path.slice(), definitions));
+							Tbjson.validate(obj, prototype[1], options, definitions, path.slice(), errors);
 						}
 					}
 
@@ -1632,11 +1630,11 @@ Tbjson.validate = (obj, prototype = null, options = {}, path = [], definitions =
 
 				// instance object
 				case INSTANCE:
-					errors.push(...Tbjson.validate(obj, prototype[1], options, path.slice(), definitions));
+					Tbjson.validate(obj, prototype[1], options, definitions, path.slice(), errors);
 			}
 
 		// object
-		} else if (obj) {
+		} else if (typeof obj =='object' && obj) {
 
 			let definition;
 
@@ -1649,7 +1647,14 @@ Tbjson.validate = (obj, prototype = null, options = {}, path = [], definitions =
 
 				// call the validate function for custom enforcement
 				if (prototype.tbjson.validate) {
-					errors.push(...tbjson.validate(obj, options));
+
+					let subErrors = tbjson.validate(obj, options);
+
+					if (options.returnOnNthError && errors.length + subErrors.length >= options.returnOnNthError) {
+						subErrors.slice(0, options.returnOnNthError - errors.length);
+					}
+
+					errors.push(subErrors);
 
 				// use the passed prototype
 				} else {
@@ -1676,18 +1681,22 @@ Tbjson.validate = (obj, prototype = null, options = {}, path = [], definitions =
 					}
 				}
 
-			// only a definition
-			} else {
+			// definition object
+			} else if (typeof prototype == 'object' && prototype) {
 				definition = prototype;
+
+			// pseudo prototype
+			} else if (typeof prototype == 'string') {
+				definition = definitions[prototype];
 			}
 
 			if (definition) {
 				for (let key in definition) {
 					if (key in obj) {
 
-						errors.push(...Tbjson.validate(obj[key], definition[key], options, path.concat(key), definitions));
+						Tbjson.validate(obj[key], definition[key], options, definitions, path.concat(key), errors);
 
-						if (options.returnOnFirstError && errors.length) {
+						if (options.returnOnNthError && errors.length >= options.returnOnNthError) {
 							break;
 						}
 					}
