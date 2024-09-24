@@ -1543,34 +1543,44 @@ Tbjson.cast = (obj, prototype, free = false, definitions = {}) => {
  * @param { function } prototype - prototype to to treat object as
  * @param { object } options - options
  */
-Tbjson.validate = (obj, prototype = null, options = {}, definitions = {}, path = [], errors = []) => {
+Tbjson.validate = (obj, prototype = null, options = {}, definitions = {}, errorCount = 0) => {
+
+	let errors;
+
+	let inputErrorCount = errorCount;
 
 	// validate type
 	if (typeof prototype == 'number') {
 
 		if (!validTypedValue(obj, prototype, options)) {
-			errors.push([path, prototype]);
+			errors = prototype;
+			errorCount++;
 		}
 
 	// compound or recursive check
 	} else {
 
-		let isNonNullObject = typeof obj == 'object' && obj;
-
 		let isArray = Array.isArray(prototype);
 		let isArrayTypeDef = Array.isArray(prototype) && prototype.length == 2;
 
 		// array
-		if (Array.isArray(obj) && isArray) {
+		if (isArray && (Array.isArray(obj) || isTypedArray(obj))) {
+
+			errors = {};
 
 			// typed array
-			if (isArrayTypeDef && prototype[0] == ARRAY) {
+			if (isArrayTypeDef && (prototype[0] == ARRAY || prototype[1] == TYPED_ARRAY)) {
 
 				for (let i = 0; i < obj.length; ++i) {
 
-					Tbjson.validate(obj[i], prototype[1], options, definitions, path.concat(i), errors);
+					let [subErrors, subErrorCount] = Tbjson.validate(obj[i], prototype[1], options, definitions, errorCount);
 
-					if (options.returnOnNthError && errors.length >= options.returnOnNthError) {
+					if (subErrorCount > errorCount) {
+						errors[i] = subErrors;
+						errorCount = subErrorCount;
+					}
+
+					if (options.returnOnNthError && errorCount >= options.returnOnNthError) {
 						break;
 					}
 				}
@@ -1580,9 +1590,14 @@ Tbjson.validate = (obj, prototype = null, options = {}, definitions = {}, path =
 
 				for (let i = 0; i < prototype.length; ++i) {
 
-					Tbjson.validate(obj[i], prototype[i], options, definitions, path.concat(i), errors);
+					let [subErrors, subErrorCount] = Tbjson.validate(obj[i], prototype[i], options, definitions, errorCount);
 
-					if (options.returnOnNthError && errors.length >= options.returnOnNthError) {
+					if (subErrorCount > errorCount) {
+						errors[i] = subErrors;
+						errorCount = subErrorCount;
+					}
+
+					if (options.returnOnNthError && errorCount >= options.returnOnNthError) {
 						break;
 					}
 				}
@@ -1597,19 +1612,28 @@ Tbjson.validate = (obj, prototype = null, options = {}, definitions = {}, path =
 				case OBJECT:
 
 					// cannot be null
-					if (isNonNullObject) {
+					if (typeof obj == 'object' && obj) {
+
+						errors = {};
+
 						for (let key in obj) {
 
-							Tbjson.validate(obj[key], prototype[1], options, definitions, path.concat(key), errors);
+							let [subErrors, subErrorCount] = Tbjson.validate(obj[key], prototype[1], options, definitions, errorCount);
 
-							if (options.returnOnNthError && errors.length >= options.returnOnNthError) {
+							if (subErrorCount > errorCount) {
+								errors[key] = subErrors;
+								errorCount = subErrorCount;
+							}
+
+							if (options.returnOnNthError && errorCount >= options.returnOnNthError) {
 								break;
 							}
 						}
 
 					// a null object must be marked nullable
 					} else {
-						errors.push([path, OBJECT]);
+						errors = OBJECT;
+						errorCount++;
 					}
 
 					break;
@@ -1622,7 +1646,7 @@ Tbjson.validate = (obj, prototype = null, options = {}, definitions = {}, path =
 
 						// ignore nullable nan
 						if (!(options.allowNullableNaN && typeof prototype[1] == 'number' && prototype[1] >= UINT8 && prototype[1] <= FLOAT64 && Number.isNaN(obj))) {
-							Tbjson.validate(obj, prototype[1], options, definitions, path.slice(), errors);
+							[errors, errorCount] = Tbjson.validate(obj, prototype[1], options, definitions, errorCount);
 						}
 					}
 
@@ -1630,7 +1654,7 @@ Tbjson.validate = (obj, prototype = null, options = {}, definitions = {}, path =
 
 				// instance object
 				case INSTANCE:
-					Tbjson.validate(obj, prototype[1], options, definitions, path.slice(), errors);
+					[errors, errorCount] = Tbjson.validate(obj, prototype[1], options, definitions, errorCount);
 			}
 
 		// object
@@ -1645,16 +1669,10 @@ Tbjson.validate = (obj, prototype = null, options = {}, definitions = {}, path =
 			// prototype is tbjson with a definition
 			if (typeof prototype == 'function' && prototype.tbjson) {
 
-				// call the validate function for custom enforcement
+				// call the validate function for custom validation
+				// TODO: improve this
 				if (prototype.tbjson.validate) {
-
-					let subErrors = tbjson.validate(obj, options);
-
-					if (options.returnOnNthError && errors.length + subErrors.length >= options.returnOnNthError) {
-						subErrors.slice(0, options.returnOnNthError - errors.length);
-					}
-
-					errors.push(subErrors);
+					[ errors, errorCount ] = tbjson.validate(obj, options, errorCount);
 
 				// use the passed prototype
 				} else {
@@ -1691,12 +1709,20 @@ Tbjson.validate = (obj, prototype = null, options = {}, definitions = {}, path =
 			}
 
 			if (definition) {
+
+				errors = {};
+
 				for (let key in definition) {
 					if (key in obj) {
 
-						Tbjson.validate(obj[key], definition[key], options, definitions, path.concat(key), errors);
+						let [subErrors, subErrorCount] = Tbjson.validate(obj[key], definition[key], options, definitions, errorCount);
 
-						if (options.returnOnNthError && errors.length >= options.returnOnNthError) {
+						if (subErrorCount > errorCount) {
+							errors[key] = subErrors;
+							errorCount = subErrorCount;
+						}
+
+						if (options.returnOnNthError && errorCount >= options.returnOnNthError) {
 							break;
 						}
 					}
@@ -1705,7 +1731,7 @@ Tbjson.validate = (obj, prototype = null, options = {}, definitions = {}, path =
 		}
 	}
 
-	return errors;
+	return [errorCount > inputErrorCount ? errors : null, errorCount];
 }
 
 /**
@@ -1901,6 +1927,23 @@ Tbjson.definition = (obj) => {
 }
 
 /* internal */
+
+function isTypedArray(val) {
+	if (typeof val == 'object' && val) {
+		return (
+			val instanceof Uint8Array ||
+			val instanceof Int8Array ||
+			val instanceof Uint16Array ||
+			val instanceof Int16Array ||
+			val instanceof Uint32Array ||
+			val instanceof Int32Array ||
+			val instanceof Float32Array ||
+			val instanceof Float64Array
+		);
+	} else {
+		return false;
+	}
+}
 
 /**
  * Return the parent of a prototype.

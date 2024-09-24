@@ -11,6 +11,11 @@ export default function(Tbjson, stringify) {
 		validFloat32 = 1000.123;
 		validFloat64 = 10000.1234567;
 		validString = 'string';
+		validFloat64Array = [0, 1, 2];
+		validFloat64Object = { a: 1, b: 2 };
+		validFloat64TypedArray = new Float64Array([0, 1, 2]);
+		validFloat64ArrayArray = [[0, 1, 2], [0, 1, 2]];
+		validFloat64ObjectObject = {a: { a: 1, b: 2 }, b: { a: 1, b: 2 }};
 
 		invalidBool1 = 12;
 		invalidBool2 = '';
@@ -23,6 +28,11 @@ export default function(Tbjson, stringify) {
 		invalidFloat32 = /regex/;
 		invalidFloat64 = Number.NaN;
 		invalidString = 12;
+		invalidFloat64Array = ['a', 1, 2];
+		invalidFloat64Object = { a: 1, b: false };
+		invalidFloat64TypedArray = new Float64Array([0, 1, null]);
+		invalidFloat64ArrayArray = [[0, 1, 2], [1, 2, true]];
+		invalidFloat64ObjectObject = {a: { a: 1, b: 2 }, b: { a: 1, b: null }};
 	}
 
 	A.tbjson = {
@@ -37,6 +47,11 @@ export default function(Tbjson, stringify) {
 			validFloat32: Tbjson.TYPES.FLOAT32,
 			validFloat64: Tbjson.TYPES.FLOAT64,
 			validString: Tbjson.TYPES.STRING,
+			validFloat64Array: [Tbjson.TYPES.ARRAY, Tbjson.TYPES.FLOAT64],
+			validFloat64Object: [Tbjson.TYPES.OBJECT, Tbjson.TYPES.FLOAT64],
+			validFloat64TypedArray: [Tbjson.TYPES.TYPED_ARRAY, Tbjson.TYPES.FLOAT64],
+			validFloat64ArrayArray: [Tbjson.TYPES.ARRAY, [Tbjson.TYPES.ARRAY, Tbjson.TYPES.FLOAT64]],
+			validFloat64ObjectObject: [Tbjson.TYPES.OBJECT, [Tbjson.TYPES.OBJECT, Tbjson.TYPES.FLOAT64]],
 
 			invalidBool1: Tbjson.TYPES.BOOL,
 			invalidBool2: Tbjson.TYPES.BOOL,
@@ -49,6 +64,11 @@ export default function(Tbjson, stringify) {
 			invalidFloat32: Tbjson.TYPES.FLOAT32,
 			invalidFloat64: Tbjson.TYPES.FLOAT64,
 			invalidString: Tbjson.TYPES.STRING,
+			invalidFloat64Array: [Tbjson.TYPES.ARRAY, Tbjson.TYPES.FLOAT64],
+			invalidFloat64Object: [Tbjson.TYPES.OBJECT, Tbjson.TYPES.FLOAT64],
+			invalidFloat64TypedArray: [Tbjson.TYPES.TYPED_ARRAY, Tbjson.TYPES.FLOAT64],
+			invalidFloat64ArrayArray: [Tbjson.TYPES.ARRAY, [Tbjson.TYPES.ARRAY, Tbjson.TYPES.FLOAT64]],
+			invalidFloat64ObjectObject: [Tbjson.TYPES.OBJECT, [Tbjson.TYPES.OBJECT, Tbjson.TYPES.FLOAT64]]
 		}
 	};
 
@@ -103,26 +123,71 @@ export default function(Tbjson, stringify) {
 	return [
 		stringify(Tbjson.validate(x)),
 		stringify([
-			[['b', 'invalidBool1'], 1],
-			[['b', 'invalidBool2'], 1],
-			[['b', 'invalidUint8'], 2],
-			[['b', 'invalidInt8'], 3],
-			[['b', 'invalidUint16'], 4],
-			[['b', 'invalidInt16'], 5],
-			[['b', 'invalidUint32'], 6],
-			[['b', 'invalidInt32'], 7],
-			[['b', 'invalidFloat32'], 8],
-			[['b', 'invalidFloat64'], 9],
-			[['b', 'invalidString'], 10],
-			[['b', 'invalidNonNullableString'], 10],
-			[['array', 0, 'invalidNullaleFloat64'], 9],
-			[['array', 1, 'invalidNullaleFloat64'], 9],
-			[['object', '1', 'invalidNullaleFloat64'], 9],
-			[['object', '2', 'invalidNullaleFloat64'], 9],
-			[['mixed', 0, 'invalidNullaleFloat64'], 9],
-			[['mixed', 1, 'invalidNullaleFloat64'], 9],
-			[['nested', 'a', 'invalidNullaleFloat64'], 9],
-			[['nested', 'b', 'invalidNullaleFloat64'], 9]
+			{
+				"b": {
+					"invalidBool1": 1,
+					"invalidBool2": 1,
+					"invalidUint8": 2,
+					"invalidInt8": 3,
+					"invalidUint16": 4,
+					"invalidInt16": 5,
+					"invalidUint32": 6,
+					"invalidInt32": 7,
+					"invalidFloat32": 8,
+					"invalidFloat64": 9,
+					"invalidString": 10,
+					"invalidFloat64Array": {
+						"0": 9
+					},
+					"invalidFloat64Object": {
+						"b": 9
+					},
+					"invalidFloat64ArrayArray": {
+						"1": {
+							"2": 9
+						}
+					},
+					"invalidFloat64ObjectObject": {
+						"b": {
+							"b": 9
+						}
+					},
+					"invalidNonNullableString": 10
+				},
+				"array": {
+					"0": {
+						"invalidNullaleFloat64": 9
+					},
+					"1": {
+						"invalidNullaleFloat64": 9
+					}
+				},
+				"object": {
+					"1": {
+						"invalidNullaleFloat64": 9
+					},
+					"2": {
+						"invalidNullaleFloat64": 9
+					}
+				},
+				"mixed": {
+					"0": {
+						"invalidNullaleFloat64": 9
+					},
+					"1": {
+						"invalidNullaleFloat64": 9
+					}
+				},
+				"nested": {
+					"a": {
+						"invalidNullaleFloat64": 9
+					},
+					"b": {
+						"invalidNullaleFloat64": 9
+					}
+				}
+			},
+			24
 		])
 	];
 }
