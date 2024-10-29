@@ -44,11 +44,11 @@ export const SIZE_FLOAT32 =                 4;
 export const SIZE_FLOAT64 =                 8;
 
 // offsets
-export const NULLABLE_OFFSET =              16;
+export const NULLABLE_OFFSET =              16;   // support 15 primitives (NULL is reserved and INSTANCE is only for casting)
 export const TYPED_ARRAY_OFFSET =           32;
 export const TYPE_OFFSET =                  48;
-export const PROTOTYPE_OFFSET =             64;   // support 16 types
-export const NULLABLE_PROTOTYPE_OFFSET =    256;  // support 192 prototypes
+export const PROTOTYPE_OFFSET =             64;   // support up to 16 types
+export const NULLABLE_PROTOTYPE_OFFSET =    256;  // support up to 192 prototypes
 export const ARRAY_OFFSET =                 512;
 export const OBJECT_OFFSET =                4096; // support 4x nested array
 

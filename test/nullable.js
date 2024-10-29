@@ -34,7 +34,9 @@ export default function(Tbjson, stringify) {
 			obj: [Tbjson.TYPES.NULLABLE, Tbjson.TYPES.OBJECT],
 			objNull: [Tbjson.TYPES.NULLABLE, Tbjson.TYPES.OBJECT],
 			a: [Tbjson.TYPES.NULLABLE, A],
-			aNull: [Tbjson.TYPES.NULLABLE, A]
+			aNull: [Tbjson.TYPES.NULLABLE, A],
+			typedArray: [Tbjson.TYPES.NULLABLE, [Tbjson.TYPES.TYPED_ARRAY, Tbjson.TYPES.FLOAT32]],
+			nullTypedArray: [Tbjson.TYPES.NULLABLE, [Tbjson.TYPES.TYPED_ARRAY, Tbjson.TYPES.FLOAT32]]
 		}
 	}]);
 
@@ -55,6 +57,8 @@ export default function(Tbjson, stringify) {
 		objNull = null;
 		a = new A();
 		aNull = null;
+		typedArray = new Float32Array([1, 2, 3, 4]);
+		nullTypedArray = null;
 	}
 
 	let x = new B();

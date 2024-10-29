@@ -24,7 +24,7 @@ import {
 	DEFAULT_BUFFER_SIZE,
 	DEFAULT_X_FACTOR,
 	DEFAULT_STR_ENCODING
-} from './constants';
+} from '../constants';
 
 const MAX_BYTES_PER_CHAR_UNICODE = 4;
 const MAX_BYTES_PER_CHAR_ASCII = 1;

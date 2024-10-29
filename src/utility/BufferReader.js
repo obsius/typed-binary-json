@@ -21,7 +21,7 @@ import {
 	SIZE_FLOAT64,
 
 	DEFAULT_STR_ENCODING
-} from './constants';
+} from '../constants';
 
 export default class BufferReader {
 
@@ -107,9 +107,19 @@ export default class BufferReader {
 		return data;
 	}
 
+	readBuffer(length) {
+
+		let buffer = this.buffer.slice(this.offset, this.offset + length);
+		this.offset += length;
+
+		return buffer;
+	}
+
 	readFixedLengthString(length) {
+
 		let data = this.buffer.toString(this.strEncoding, this.offset, this.offset + length);
 		this.offset += length;
+
 		return data;
 	}
 

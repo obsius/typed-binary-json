@@ -3,6 +3,7 @@ import Tbjson from '../src/Tbjson';
 import cast from './cast';
 import clone from './clone';
 import definition from './definition';
+import flattenValidation from './flattenValidation';
 import inheritance from './inheritance';
 import nested from './nested';
 import nestedDefinition from './nestedDefinition';
@@ -18,12 +19,23 @@ import strings from './strings';
 import typed from './typed.js';
 import typedArray from './typedArray';
 import typedSelection from './typedSelection';
+import types from './types.js';
+import typesCast from './typesCast.js';
 import unbuild from './unbuild';
 import validate from './validate';
 import variableDefs from './variableDefs';
 
-function stringify(val) {
+function stringify(val, cast = false) {
 	return JSON.stringify(val, (name, val) => {
+
+		if (cast) {
+			if (typeof val == 'bigint') {
+				val = Number(val);
+			} else if (val instanceof Date || val instanceof RegExp) {
+				val = val.toString();
+			}
+		}
+
 		if (typeof val == 'number') {
 			return +val.toFixed(3);
 		}
@@ -77,8 +89,11 @@ function run() {
 	runTest('Typed', typed);
 	runTest('Typed Array', typedArray);
 	runTest('Typed Selection', typedSelection);
+	runTest('Types', types);
+	runTest('Types Cast', typesCast);
 	runTest('Unbuild', unbuild);
 	runTest('Validate', validate);
+	runTest('Validation Flattened', flattenValidation);
 	runTest('Variable Definitions', variableDefs);
 }
 

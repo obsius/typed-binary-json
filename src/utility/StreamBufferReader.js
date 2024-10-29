@@ -8,7 +8,7 @@ import {
 
 	DEFAULT_BUFFER_SIZE,
 	DEFAULT_STR_ENCODING
-} from './constants';
+} from '../constants';
 
 export default class StreamBufferReader {
 

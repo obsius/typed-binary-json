@@ -45,14 +45,25 @@ import {
 	DEFAULT_X_FACTOR
 } from './constants';
 
-import Type from './Type';
 import Prototype from './Prototype';
-import BufferWriter from './BufferWriter';
-import BufferReader from './BufferReader';
-import StreamBufferWriter from './StreamBufferWriter';
-import StreamBufferReader from './StreamBufferReader';
 
-// TODO : 10/2020 : support nested objects
+import BufferReader from './utility/BufferReader';
+import BufferWriter from './utility/BufferWriter';
+import StreamBufferReader from './utility/StreamBufferReader';
+import StreamBufferWriter from './utility/StreamBufferWriter';
+import getParent from './utility/getParent';
+
+import Type from './types/Type';
+import BigIntType from './types/BigIntType';
+import DateType from './types/DateType';
+import RegexType from './types/RegexType';
+
+import cast from './functions/cast';
+import clone from './functions/clone';
+import definition from './functions/definition';
+import flattenValidation from './functions/flattenValidation';
+import serialize from './functions/serialize';
+import validate from './functions/validate';
 
 /**
  * Tbjson
@@ -63,7 +74,7 @@ export default class Tbjson {
 
 	version = VERSION;
 
-	// TODO: for registered types (primitives)
+	// for registered types (primitives)
 	typeRefs = {};
 	types = {};
 
@@ -202,6 +213,7 @@ export default class Tbjson {
 
 		// check if finalized
 		if (this.finalized) {
+
 			if (typeof prototype == 'function' && prototype.tbjson) {
 				return this.protoRefs[prototype.name];
 			}
@@ -224,6 +236,7 @@ export default class Tbjson {
 					prototype: prototype,
 					...prototype.tbjson
 				};
+
 			} else {
 				prototype = { prototype };
 			}
@@ -298,41 +311,49 @@ export default class Tbjson {
 	}
 	
 	/**
-	 * TODO:
 	 * Register a type.
 	 * 
 	 * Example:
 	 * 
-	 * tbjson.registerType('Float48', (data, buffer) => {}, (buffer) => obj);
+	 * {
+	 *     ref: 'Float48',
+	 *     serialize: (buffer, data) => { ... },
+	 *     deserialize: (buffer) => { ... }
+	 * }
 	 * 
 	 * @param { object } type - type to add
 	 */
 	registerType(type) {
-		
+
+		let code = this.typeRefs[type.ref];
+
+		if (!code) {
+
+			code = this.nextTypeCode++;
+
+			this.typeRefs[type.ref] = code;
+			this.types[code] = type;
+		}
+
+		return code;
 	}
 	
 	/**
-	 * TODO:
 	 * Register types.
 	 * 
 	 * Example:
 	 * 
 	 * [{
 	 *     ref: 'Float48',
-	 *     serializer: function(data, buffer) {
-	 *         buffer.writeUint8(...);
-	 *     },
-	 *     deserializer: function(buffer) {
-	 *         let num = buffer.readUint8(...);
-	 *         return num;
-	 *     }
+	 *     serializer: function(buffer, data) { ... },
+	 *     deserializer: function(buffer) { ... }
 	 * }]
 	 * 
 	 * @param { []object } types - array of types to register 
 	 */
 	registerTypes(types = []) {
 		for (let type of types) {
-			this.registerType(ref, type.serializer, type.deserializer);
+			this.registerType(type);
 		}
 	}
 
@@ -426,6 +447,7 @@ export default class Tbjson {
 			// flush and cleanup
 			this.writer.flush();
 			this.writer = null;
+
 		} catch (e) {
 			e.message = 'Tbjson failed to serialize to the stream: ' + e.message;
 			throw e;
@@ -518,7 +540,7 @@ export default class Tbjson {
 	}
 
 	/**
-	 * TODO:
+	 * TODO
 	 * Parse a TBJSON containing stream into an object. Slower, but uses the least memory.
 	 * 
 	 * @param { stream } stream - stream to read from
@@ -589,12 +611,9 @@ export default class Tbjson {
 	getHeader() {
 
 		// get the type serializers / deserializers
-		let typeDefs = {};
+		let typeSizes = {};
 		for (let code in this.types) {
-			typeDefs[code] = {
-				serializer: type.serializer ? this.types[code].serializer.toString() : null,
-				deserializer: type.deserializer ? this.types[code].deserializer.toString() : null
-			};
+			typeSizes[code] = this.types[code].size;
 		}
 
 		// get the prototype definitions
@@ -607,7 +626,7 @@ export default class Tbjson {
 			version: VERSION,
 			offsets: this.offsets,
 			typeRefs: this.typeRefs,
-			typeDefs: typeDefs,
+			typeSizes: typeSizes,
 			protoRefs: this.protoRefs,
 			protoDefs: protoDefs,
 			objs: this.objs,
@@ -660,9 +679,12 @@ export default class Tbjson {
 
 			// types
 			this.typeRefs = header.typeRefs;
-			this.types = {};
-			for (let code in header.typeDefs) {
-				this.types[code] = new Type(Function(header.typeDefs[code].serializer), Function(header.typeDefs[code].deserializer));
+			for (let code in header.typeSizes) {
+				if (this.types[code]) {
+					this.types[code].size = header.typeSizes[code];
+				} else {
+					this.types[code] = new Type(undefined, header.typeSizes[code]);
+				}
 			}
 
 			// prototypes (preserve proto constructors for typed parsing)
@@ -791,11 +813,24 @@ export default class Tbjson {
 			// string referencing a prototype, add the string to the reference lookup table
 			case 'string':
 
-				if (!this.protoRefs[def]) {
-					this.protoRefs[def] = this.nextProtoCode++;
-				}
+				// type
+				if (def[0] == '@') {
 
-				return this.protoRefs[def];
+					if (!this.typeRefs[def]) {
+						this.typeRefs[def] = this.nextTypeCode++;
+					}
+
+					return this.typeRefs[def];
+
+				// proto
+				} else {
+					
+					if (!this.protoRefs[def]) {
+						this.protoRefs[def] = this.nextProtoCode++;
+					}
+
+					return this.protoRefs[def];
+				}
 
 			// prototype (class)
 			case 'function':
@@ -812,7 +847,7 @@ export default class Tbjson {
 				} else if (Array.isArray(def)) {
 
 					// typed array
-					if (def.length == 2 && typeof def[0] == 'number' && def[0] > 10) {
+					if (def.length == 2 && typeof def[0] == 'number' && def[0] > STRING) {
 
 						// array
 						if (def[0] == ARRAY) {
@@ -827,7 +862,7 @@ export default class Tbjson {
 							if (subDef < NULLABLE_OFFSET) {
 								return NULLABLE_OFFSET + subDef;
 
-							// prototype
+							// type or prototype
 							} else {
 								return this.offsets.nullablePrototype + subDef;
 							}
@@ -853,10 +888,6 @@ export default class Tbjson {
 						// instance object
 						} else if (def[0] == INSTANCE) {
 							return OBJECT;
-
-						// TODO : ERROR
-						} else {
-
 						}
 
 					// fixed length array
@@ -950,7 +981,7 @@ export default class Tbjson {
 			// typed
 			case 'number':
 
-				// primitive
+				// primitive or higher-order type
 				if (def < NULLABLE_OFFSET) {
 
 					// an unknown object
@@ -970,9 +1001,9 @@ export default class Tbjson {
 				} else if (def < TYPED_ARRAY_OFFSET) {
 
 					if (obj == null) {
-						this.writer.write(UINT8, 0);
+						this.writer.write(NULL);
 					} else {
-						this.writer.write(UINT8, 1);
+						this.writer.write(BOOL, true);
 						this.serializeDef(obj, def - NULLABLE_OFFSET);
 					}
 
@@ -981,33 +1012,29 @@ export default class Tbjson {
 					this.writer.write(UINT32, obj.buffer.byteLength);
 					this.writer.writeBuffer(Buffer.from(obj.buffer));
 
-				// custom type
+				// type
 				} else if (def < this.offsets.prototype) {
-					//TODO
 
-				// known prototype
-				} else if (def < this.offsets.array) {
-
-					let valid = obj != null && typeof obj == 'object';
-
-					// validate the object
-					if (def < this.offsets.nullablePrototype) {
-						if (!valid) {
-							throw new Error(`Null objects cannot be passed into known prototypes, mark as a nullable known prototype instead: ${this.protos[def] ? this.protos[def].prototype : def}`);
-						}
-
-					// null values allowed, mark it as null or not
-					} else {
-						if (valid) {
-							def -= this.offsets.nullablePrototype;
-							this.writer.write(BOOL, true);
-						} else {
-							this.writer.write(NULL);
-							return;
-						}
+					if (!this.types[def] || this.types[def].ref == null) {
+						throw new Error('Missing type definition');
 					}
-				
-					// known type
+
+					let buffer = this.types[def].serialize(obj);
+
+					if (!this.types[def].size) {
+						this.writer.write(UINT16, buffer.length);
+					}
+					
+					this.writer.writeBuffer(buffer);
+
+				// prototype
+				} else if (def < this.offsets.nullablePrototype) {
+
+					if (obj == null || typeof obj != 'object') {
+						throw new Error(`Null objects cannot be passed into known prototypes, mark as a nullable known prototype instead: ${this.protos[def] ? this.protos[def].prototype : def}`);
+					}
+
+					// known prototype
 					if (obj.constructor.tbjson) {
 
 						// register the prototype if needed
@@ -1020,6 +1047,17 @@ export default class Tbjson {
 					}
 
 					this.serializeDef(obj, this.protos[def].definition);
+
+				// nullable type or prototype
+				} else if (def < this.offsets.array) {
+
+					// null values allowed, mark it as null or not
+					if (obj == null) {
+						this.writer.write(NULL);
+					} else {
+						this.writer.write(BOOL, true);
+						this.serializeDef(obj, def - this.offsets.nullablePrototype);
+					}
 
 				// variable-length fixed typed array 
 				} else if (def < this.offsets.object) {
@@ -1287,27 +1325,44 @@ export default class Tbjson {
 			} else if (def < TYPE_OFFSET) {
 				return this.reader.readTypedArray(def - TYPED_ARRAY_OFFSET, this.reader.read(UINT32));
 
-			// custom type
+			// type
 			} else if (def < this.offsets.prototype) {
-				return this.reader.read(def);
 
-			// known prototype
-			} else if (def < this.offsets.array) {
+				let type = this.types[def];
 
-				// nullable
-				if (def >= this.offsets.nullablePrototype) {
+				if (type) {
 
-					// null
-					if (!this.reader.read(UINT8)) {
-						return null;
+					let buffer;
+					
+					if (type.size) {
+						buffer = this.reader.readBuffer(type.size);
+					} else {
+						let length = this.reader.read(UINT16);
+						buffer = this.reader.readBuffer(length);
 					}
 
-					def -= this.offsets.nullablePrototype;
+					if (type.ref) {
+						return type.deserialize(buffer);
+					} else {
+						return buffer.toString('base64');
+					}
 				}
 
-				let proto = this.protos[def];
+			// prototype
+			} else if (def < this.offsets.nullablePrototype) {
 
+				let proto = this.protos[def];
 				return this.parse(proto.definition ? proto.definition : this.objs[this.reader.read(UINT16)], proto.prototype);
+
+			// nullable typed array / type / prototype
+			} else if (def < this.offsets.array) {
+
+				// null
+				if (!this.reader.read(UINT8)) {
+					return null;
+				}
+
+				return this.parse(def - this.offsets.nullablePrototype);
 
 			// variable-length fixed typed array 
 			} else if (def < this.offsets.object) {
@@ -1364,644 +1419,36 @@ export default class Tbjson {
 	}
 }
 
-Tbjson.TYPES = { NULL, BOOL, INT8, UINT8, INT16, UINT16, INT32, UINT32, FLOAT32, FLOAT64, STRING, ARRAY, OBJECT, NULLABLE, TYPED_ARRAY, UNKNOWN, VARIABLE_DEF, INSTANCE };
-
-/**
- * Cast a plain object into the typed object it represents. Only supports prototype definitions, not strings.
- * 
- * @param { object } obj - object to parse
- * @param { function } prototype - prototype to cast into
- * @param { bool } free - set obj properties to undefined as the obj is cast (slower, but frees up memory)
- */
-Tbjson.cast = (obj, prototype, free = false, definitions = {}) => {
-
-	// plain object or array with a definition (ignore prototyped)
-	if (prototype && (typeof prototype == 'function' || typeof prototype == 'object')) {
-
-		let isNonNullObject = typeof obj == 'object' && obj;
-
-		let isArray = Array.isArray(prototype);
-		let isArrayTypeDef = Array.isArray(prototype) && prototype.length == 2;
-
-		// array
-		if (Array.isArray(obj) && isArray) {
-
-			let typedObj;
-
-			// typed array
-			if (isArrayTypeDef && prototype[0] == ARRAY) {
-
-				typedObj = new Array(obj.length);
-
-				for (let i = 0; i < obj.length; ++i) {
-					typedObj[i] = Tbjson.cast(obj[i], prototype[1], free, definitions);
-					if (free) { obj[i] = undefined; }
-				}
-				
-			// unknown array
-			} else {
-
-				typedObj = new Array(prototype.length);
-
-				for (let i = 0; i < prototype.length; ++i) {
-					typedObj[i] = Tbjson.cast(obj[i], prototype[i], free, definitions);
-					if (free) { obj[i] = undefined; }
-				}
-			}
-
-			return typedObj;
-
-		// qualified type
-		} else if (isArrayTypeDef) {
-		
-			switch (prototype[0]) {
-
-				// uniform value object
-				case OBJECT:
-
-					let typedObj = {};
-
-					if (isNonNullObject) {
-						for (let key in obj) {
-							typedObj[key] = Tbjson.cast(obj[key], prototype[1], free, definitions);
-							if (free) { obj[key] = undefined; }
-						}
-					}
-
-					return typedObj;
-
-				// nullable object
-				case NULLABLE:
-					return obj == null ? null : Tbjson.cast(obj, prototype[1], free, definitions);
-			
-				// variable def, won't know this when casting
-				case VARIABLE_DEF:
-					return obj;
-
-				// instance object
-				case INSTANCE:
-					return Tbjson.cast(obj, prototype[1], free, definitions);
-			}
-
-		// non-prototyped object
-		} else if (!obj || !obj.constructor || obj.constructor.prototype == Object.prototype) {
-
-			let tbjson = prototype.tbjson;
-
-			// prototype is tbjson with a definition
-			if (tbjson && tbjson.definition) {
-
-				let typedObj;
-				let definition;
-
-				// call the cast function to instantiate the correct prototype
-				if (tbjson.cast) {
-					return Tbjson.cast(obj, tbjson.cast(obj), free, definitions);
-
-				// use the passed prototype
-				} else {
-					typedObj = new prototype();
-				}
-
-				if (isNonNullObject) {
-
-					// use map
-					if (definitions[prototype.name]) {
-						definition = definitions[prototype.name];
-
-					// check for parent
-					} else {
-
-						definition = tbjson.definition;
-
-						// only check for a parent if the definition is an object
-						if (typeof definition == 'object') {
-
-							for (let parent = prototype; parent = getParent(parent);) {
-								if (!parent.tbjson || !parent.tbjson.definition) { break; }
-								definition = Object.assign({}, parent.tbjson.definition, definition);
-							}
-
-							definitions[prototype.name] = definition;
-						}
-					}
-
-					// fallback to the prototype if definition is an object
-					if (definition == OBJECT) {
-						for (let key in typedObj) {
-							if (key in obj) {
-								typedObj[key] = obj[key];
-								if (free) { obj[key] = undefined; }
-							}
-						}
-
-					// continue deeper
-					} else {
-						for (let key in definition) {
-							if (key in obj) {
-								typedObj[key] = Tbjson.cast(obj[key], definition[key], free, definitions);
-								if (free) { obj[key] = undefined; }
-							}
-						}
-					}
-				}
-
-				// call the build function for post construction
-				if (tbjson.build) {
-					tbjson.build(typedObj);
-				}
-
-				return typedObj;
-
-			// prototype is a raw definition
-			} else {
-
-				let typedObj = {};
-
-				if (isNonNullObject) {
-					for (let key in prototype) {
-						if (key in obj) {
-							typedObj[key] = Tbjson.cast(obj[key], prototype[key], free, definitions);
-							if (free) { obj[key] = undefined; }
-						}
-					}
-				}
-
-				return typedObj;
-			}
-		}
-	}
-
-	// primitive, untyped, or prototyped
-	return obj;
-}
-
-/**
- * Check a prototype instance (or plain object with specified proto) for invalid fields using the TBJSON definition when available.
- * 
- * @param { object } obj - object to check
- * @param { function } prototype - prototype to to treat object as
- * @param { object } options - options
- */
-Tbjson.validate = (obj, prototype = null, options = {}, definitions = {}, errorCount = 0) => {
-
-	let errors;
-
-	let inputErrorCount = errorCount;
-
-	// validate type
-	if (typeof prototype == 'number') {
-
-		if (!validTypedValue(obj, prototype, options)) {
-			errors = prototype;
-			errorCount++;
-		}
-
-	// compound or recursive check
-	} else {
-
-		let isArray = Array.isArray(prototype);
-		let isArrayTypeDef = Array.isArray(prototype) && prototype.length == 2;
-
-		// array
-		if (isArray && (Array.isArray(obj) || isTypedArray(obj))) {
-
-			errors = {};
-
-			// typed array
-			if (isArrayTypeDef && (prototype[0] == ARRAY || prototype[1] == TYPED_ARRAY)) {
-
-				for (let i = 0; i < obj.length; ++i) {
-
-					let [subErrors, subErrorCount] = Tbjson.validate(obj[i], prototype[1], options, definitions, errorCount);
-
-					if (subErrorCount > errorCount) {
-						errors[i] = subErrors;
-						errorCount = subErrorCount;
-					}
-
-					if (options.returnOnNthError && errorCount >= options.returnOnNthError) {
-						break;
-					}
-				}
-				
-			// unknown array
-			} else {
-
-				for (let i = 0; i < prototype.length; ++i) {
-
-					let [subErrors, subErrorCount] = Tbjson.validate(obj[i], prototype[i], options, definitions, errorCount);
-
-					if (subErrorCount > errorCount) {
-						errors[i] = subErrors;
-						errorCount = subErrorCount;
-					}
-
-					if (options.returnOnNthError && errorCount >= options.returnOnNthError) {
-						break;
-					}
-				}
-			}
-
-		// qualified type
-		} else if (isArrayTypeDef) {
-
-			switch (prototype[0]) {
-
-				// uniform value object
-				case OBJECT:
-
-					// cannot be null
-					if (typeof obj == 'object' && obj) {
-
-						errors = {};
-
-						for (let key in obj) {
-
-							let [subErrors, subErrorCount] = Tbjson.validate(obj[key], prototype[1], options, definitions, errorCount);
-
-							if (subErrorCount > errorCount) {
-								errors[key] = subErrors;
-								errorCount = subErrorCount;
-							}
-
-							if (options.returnOnNthError && errorCount >= options.returnOnNthError) {
-								break;
-							}
-						}
-
-					// a null object must be marked nullable
-					} else {
-						errors = OBJECT;
-						errorCount++;
-					}
-
-					break;
-
-				// nullable object
-				case NULLABLE:
-
-					// ignore if null
-					if (obj != null) {
-
-						// ignore nullable nan
-						if (!(options.allowNullableNaN && typeof prototype[1] == 'number' && prototype[1] >= UINT8 && prototype[1] <= FLOAT64 && Number.isNaN(obj))) {
-							[errors, errorCount] = Tbjson.validate(obj, prototype[1], options, definitions, errorCount);
-						}
-					}
-
-					break;
-
-				// instance object
-				case INSTANCE:
-					[errors, errorCount] = Tbjson.validate(obj, prototype[1], options, definitions, errorCount);
-			}
-
-		// object
-		} else if (typeof obj =='object' && obj) {
-
-			let definition;
-
-			if (!prototype) {
-				prototype = obj.constructor;
-			}
-
-			// prototype is tbjson with a definition
-			if (typeof prototype == 'function' && prototype.tbjson) {
-
-				// call the validate function for custom validation
-				// TODO: improve this
-				if (prototype.tbjson.validate) {
-					[ errors, errorCount ] = tbjson.validate(obj, options, errorCount);
-
-				// use the passed prototype
-				} else {
-
-					// use map
-					if (definitions[prototype.name]) {
-						definition = definitions[prototype.name];
-
-					// check for parent
-					} else {
-
-						definition = prototype.tbjson.definition;
-
-						// only check for a parent if the definition is an object
-						if (typeof definition == 'object') {
-
-							for (let parent = prototype; parent = getParent(parent);) {
-								if (!parent.tbjson || !parent.tbjson.definition) { break; }
-								definition = Object.assign({}, parent.tbjson.definition, definition);
-							}
-
-							definitions[prototype.name] = definition;
-						}
-					}
-				}
-
-			// definition object
-			} else if (typeof prototype == 'object' && prototype) {
-				definition = prototype;
-
-			// pseudo prototype
-			} else if (typeof prototype == 'string') {
-				definition = definitions[prototype];
-			}
-
-			if (definition) {
-
-				errors = {};
-
-				for (let key in definition) {
-					if (key in obj) {
-
-						let [subErrors, subErrorCount] = Tbjson.validate(obj[key], definition[key], options, definitions, errorCount);
-
-						if (subErrorCount > errorCount) {
-							errors[key] = subErrors;
-							errorCount = subErrorCount;
-						}
-
-						if (options.returnOnNthError && errorCount >= options.returnOnNthError) {
-							break;
-						}
-					}
-				}
-			}
-		}
-	}
-
-	return [errorCount > inputErrorCount ? errors : null, errorCount];
-}
-
-/**
- * Serialize the typed object into a plain object ignoring typing rules, but obeying which properties should be ignored.
- * 
- * @param { string } obj - object to serialize
- */
-Tbjson.serialize = (obj, definitions = {}) => {
-
-	// object or array
-	if (obj && typeof obj == 'object') {
-
-		// array
-		if (Array.isArray(obj)) {
-
-			let retObj = new Array(obj.length);
-
-			for (let i = 0; i < obj.length; ++i) {
-				retObj[i] = Tbjson.serialize(obj[i], definitions);
-			}
-
-			return retObj;
-
-		// typed array (no need to check elements as they must all be primitives)
-		} else if (ArrayBuffer.isView(obj)) {
-
-			let retObj = new Array(obj.length);
-
-			for (let i = 0; i < obj.length; ++i) {
-				retObj[i] = obj[i];
-			}
-
-			return retObj;
-
-		// object
-		} else {
-
-			let retObj = {};
-
-			// typed
-			if (typeof obj.constructor == 'function' && obj.constructor.tbjson && obj.constructor.tbjson.definition) {
-
-				let definition = definitions[obj.constructor.name];
-
-				// do a lookup for the parent definitions and flatten into one
-				if (!definition) {
-
-					definition = obj.constructor.tbjson.definition;
-
-					for (let parent = obj.constructor; parent = getParent(parent);) {
-						if (!parent.tbjson || !parent.tbjson.definition) { break; }
-						definition = Object.assign({}, parent.tbjson.definition, definition);
-					}
-
-					definitions[obj.constructor.name] = definition;
-				}
-
-				let constructor = obj.constructor;
-				
-				// unbuild
-				if (constructor.tbjson.unbuild) {
-					obj = constructor.tbjson.unbuild(obj);
-				}
-
-				for (let key in definition) {
-					retObj[key] = Tbjson.serialize(obj[key], definitions);
-				}
-
-			// plain
-			} else {
-
-				for (let key in obj) {
-					retObj[key] = Tbjson.serialize(obj[key], definitions);
-				}
-			}
-
-			return retObj;
-		}
-	}
-
-	// primitive
-	return obj;
-}
-
-/**
- * Clone the typed object into a prototyped object ignoring typing rules, but obeying which properties should be ignored.
- * 
- * @param { string } obj - object to serialize
- */
-Tbjson.clone = (obj, definitions = {}) => {
-
-	// object or array
-	if (obj && typeof obj == 'object') {
-
-		// array
-		if (Array.isArray(obj)) {
-
-			let retObj = new Array(obj.length);
-
-			for (let i = 0; i < obj.length; ++i) {
-				retObj[i] = Tbjson.clone(obj[i], definitions);
-			}
-
-			return retObj;
-
-		// typed array
-		} else if (ArrayBuffer.isView(obj)) {
-
-			return obj.slice();
-
-		// object
-		} else {
-
-			let retObj = {};
-
-			// typed
-			if (typeof obj.constructor == 'function' && obj.constructor.tbjson && obj.constructor.tbjson.definition) {
-
-				let definition = definitions[obj.constructor.name];
-
-				// do a lookup for the parent definitions and flatten into one
-				if (!definition) {
-
-					definition = obj.constructor.tbjson.definition;
-
-					for (let parent = obj.constructor; parent = getParent(parent);) {
-						if (!parent.tbjson || !parent.tbjson.definition) { break; }
-						definition = Object.assign({}, parent.tbjson.definition, definition);
-					}
-
-					definitions[obj.constructor.name] = definition;
-				}
-
-				let constructor = obj.constructor;
-
-				// unbuild
-				if (constructor.tbjson.unbuild) {
-					obj = constructor.tbjson.unbuild(obj);
-				}
-
-				// custom clone function
-				if (constructor.tbjson.clone) {
-					retObj = constructor.tbjson.clone(obj);
-
-				// generic clone function
-				} else {
-					
-					for (let key in definition) {
-						retObj[key] = Tbjson.clone(obj[key], definitions);
-					}
-
-					// cast
-					retObj = Tbjson.cast(retObj, constructor);
-				}
-
-			// date object
-			} else if (obj instanceof Date) {
-				retObj = new Date(obj.getTime());
-
-			// plain
-			} else {
-
-				for (let key in obj) {
-					retObj[key] = Tbjson.clone(obj[key], definitions);
-				}
-			}
-
-			return retObj;
-		}
-	}
-
-	// primitive
-	return obj;
-}
-
-/**
- * Return the flattened TBJSON definition. For prototypes that have parents.
- * 
- * @param { obj } obj - object to compute definition of 
- */
-Tbjson.definition = (obj) => {
-	if (obj && typeof obj == 'object' && obj.constructor.tbjson && obj.constructor.tbjson.definition) {
-
-		let definition = obj.constructor.tbjson.definition;
-
-		for (let parent = obj.constructor; parent = getParent(parent);) {
-			if (!parent.tbjson || !parent.tbjson.definition) { break; }
-			definition = Object.assign({}, parent.tbjson.definition, definition);
-		}
-
-		return definition;
-	}
-}
-
-/* internal */
-
-function isTypedArray(val) {
-	if (typeof val == 'object' && val) {
-		return (
-			val instanceof Uint8Array ||
-			val instanceof Int8Array ||
-			val instanceof Uint16Array ||
-			val instanceof Int16Array ||
-			val instanceof Uint32Array ||
-			val instanceof Int32Array ||
-			val instanceof Float32Array ||
-			val instanceof Float64Array
-		);
-	} else {
-		return false;
-	}
-}
-
-/**
- * Return the parent of a prototype.
- * 
- * @param { function } prototype - prototype to check for parent of 
- */
-function getParent(prototype) {
-	let parent = prototype ? Object.getPrototypeOf(prototype) : null;
-	return (parent && parent.name) ? parent : null;
-}
-
-/**
- * Check if a value conforms to a primitive type.
- * 
- * @param { * } val - value to check
- * @param { number } type - the tbjson primitive type
- * @param { object } options - options
- */
-function validTypedValue(val, type, options = {}) {
-	switch (type) {
-
-		case NULL:
-			return val == null;
-
-		case BOOL:
-			return typeof val == 'boolean' || val === 0 || val === 1;
-
-		case INT8:
-			return typeof val == 'number' && (Number.isNaN(val) ? !!options.allowNaN : val >= -128 && val <= 127);
-
-		case UINT8:
-			return typeof val == 'number' && (Number.isNaN(val) ? !!options.allowNaN : val >= 0 && val <= 255);
-
-		case INT16:
-			return typeof val == 'number' && (Number.isNaN(val) ? !!options.allowNaN : val >= -32768  && val <= 32767);
-
-		case UINT16:
-			return typeof val == 'number' && (Number.isNaN(val) ? !!options.allowNaN : val >= 0 && val <= 65535);
-
-		case INT32:
-			return typeof val == 'number' && (Number.isNaN(val) ? !!options.allowNaN : val >= -2147483648 && val < 2147483647);
-
-		case UINT32:
-			return typeof val == 'number' && (Number.isNaN(val) ? !!options.allowNaN : val >= 0 && val <= 4294967295);
-
-		case FLOAT32:
-		case FLOAT64:
-			return typeof val == 'number' && (!!options.allowNaN || !Number.isNaN(val));
-
-		case STRING:
-			return typeof val == 'string' || (!!options.allowNullString && val == null);
-
-		case ARRAY:
-			return Array.isArray(val);
-
-		case OBJECT:
-			return typeof val == 'object' && val != null;
-	}
-
-	return true;
-}
+// constant types (primitive and higher order)
+Tbjson.TYPES = {
+	NULL,
+	BOOL,
+	INT8,
+	UINT8,
+	INT16,
+	UINT16,
+	INT32,
+	UINT32,
+	FLOAT32,
+	FLOAT64,
+	STRING,
+	ARRAY,
+	OBJECT,
+	NULLABLE,
+	TYPED_ARRAY,
+	UNKNOWN,
+	VARIABLE_DEF,
+	INSTANCE
+};
+
+// custom types (user can add more using Type as a base class)
+Tbjson.Type = Type;
+Tbjson.Types = { BigIntType, DateType, RegexType };
+
+// functions
+Tbjson.cast = cast;
+Tbjson.clone = clone;
+Tbjson.definition = definition;
+Tbjson.flattenValidation = flattenValidation;
+Tbjson.serialize = serialize;
+Tbjson.validate = validate;
