@@ -11,11 +11,13 @@ export default function(Tbjson, stringify, validateTypes) {
 		float32 = 1000.123;
 		float64 = 10000.1234567;
 		string = '1234567890_+!@#$%^&*()';
+		arrayTyped = [false, 100, 999.999];
+		arrayUntyped = [false];
+		object = { key: 'value' };
 		unknownBool = false;
 		unknownNumber = 10.123;
 		unknownString = 'unknown';
 		unknownNull = null;
-		array = [false, 100, 999.999];
 	}
 
 	A.tbjson = {
@@ -30,11 +32,13 @@ export default function(Tbjson, stringify, validateTypes) {
 			float32: Tbjson.TYPES.FLOAT32,
 			float64: Tbjson.TYPES.FLOAT64,
 			string: Tbjson.TYPES.STRING,
+			arrayTyped: [Tbjson.TYPES.BOOL, Tbjson.TYPES.INT32, Tbjson.TYPES.FLOAT64],
+			arrayUntyped: Tbjson.TYPES.ARRAY,
+			object: Tbjson.TYPES.OBJECT,
 			unknownBool: Tbjson.TYPES.UNKNOWN,
 			unknownNumber: Tbjson.TYPES.UNKNOWN,
 			unknownString: Tbjson.TYPES.UNKNOWN,
-			unknownNull: [Tbjson.TYPES.NULLABLE, Tbjson.TYPES.UNKNOWN],
-			array: [Tbjson.TYPES.BOOL, Tbjson.TYPES.INT32, Tbjson.TYPES.FLOAT64]
+			unknownNull: [Tbjson.TYPES.NULLABLE, Tbjson.TYPES.UNKNOWN]
 		}
 	};
 
@@ -116,7 +120,7 @@ export default function(Tbjson, stringify, validateTypes) {
 
 	let x = new E();
 
-	let typedX = Tbjson.cast(JSON.parse(stringify(x)), E);
+	let typedX = Tbjson.cast(JSON.parse(stringify(x)), E, undefined, true);
 
 	let invalid = validateTypes(x, typedX);
 	if (invalid) { return invalid; }

@@ -178,14 +178,14 @@ export default function cast(obj, prototype, types, castPrimitives = false, free
 		}
 	}
 
+	// cast type from its base64 data
 	if (types && typeof prototype == 'string' && typeof obj == 'string' && prototype[0] == '@' && types[prototype]) {
 		obj = types[prototype].deserialize(Buffer.from(obj, 'base64'));
-	}
 
 	// cast primitive (allow for null)
-	if (castPrimitives && typeof prototype == 'number') {
+	} else if (castPrimitives && typeof prototype == 'number' && prototype < ARRAY) {
 
-		if (typeof obj != 'bool' && typeof obj != 'number' && typeof obj != 'string') {
+		if (typeof obj != 'boolean' && typeof obj != 'number' && typeof obj != 'string') {
 			obj = null;
 
 		// bool
@@ -197,7 +197,7 @@ export default function cast(obj, prototype, types, castPrimitives = false, free
 			obj = '' + obj;
 
 		// number
-		} else if (prototype > BOOL && prototype < STRING) {
+		} else {
 			obj = +obj;
 		}
 	}
