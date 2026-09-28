@@ -7,13 +7,7 @@ export default class RegexType extends Type {
 	}
 
 	serialize(regex) {
-
-		let string = regex.toString();
-		let buffer = Buffer.allocUnsafe(string.length);
-
-		buffer.write(string, 'utf8');
-
-		return buffer;
+		return Buffer.from(regex.toString(), 'utf8');
 	}
 
 	deserialize (buffer) {

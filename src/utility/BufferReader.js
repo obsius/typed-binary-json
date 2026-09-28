@@ -1,4 +1,5 @@
 import {
+	NULL,
 	BOOL,
 	UINT8,
 	INT8,
@@ -28,8 +29,11 @@ export default class BufferReader {
 	offset = 0;
 
 	constructor(buffer, strEncoding = DEFAULT_STR_ENCODING) {
+
 		this.buffer = buffer;
 		this.strEncoding = strEncoding;
+
+		this.view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
 	}
 
 	read(type) {
@@ -37,48 +41,52 @@ export default class BufferReader {
 
 		switch (type) {
 
+			case NULL:
+				data = null;
+				break;
+
 			case BOOL:
-				data = !!this.buffer.readUInt8(this.offset);
+				data = !!this.buffer[this.offset];
 				this.offset += SIZE_UINT8;
 				break;
 
 			case UINT8:
-				data = this.buffer.readUInt8(this.offset);
+				data = this.buffer[this.offset];
 				this.offset += SIZE_UINT8;
 				break;
 
 			case INT8:
-				data = this.buffer.readInt8(this.offset);
+				data = this.view.getInt8(this.offset);
 				this.offset += SIZE_INT8;
 				break;
 
 			case UINT16:
-				data = this.buffer.readUInt16BE(this.offset);
+				data = this.view.getUint16(this.offset);
 				this.offset += SIZE_UINT16;
 				break;
 
 			case INT16:
-				data = this.buffer.readInt16BE(this.offset);
+				data = this.view.getInt16(this.offset);
 				this.offset += SIZE_INT16;
 				break;
 
 			case UINT32:
-				data = this.buffer.readUInt32BE(this.offset);
+				data = this.view.getUint32(this.offset);
 				this.offset += SIZE_UINT32;
 				break;
 
 			case INT32:
-				data = this.buffer.readInt32BE(this.offset);
+				data = this.view.getInt32(this.offset);
 				this.offset += SIZE_INT32;
 				break;
 
 			case FLOAT32:
-				data = this.buffer.readFloatBE(this.offset);
+				data = this.view.getFloat32(this.offset);
 				this.offset += SIZE_FLOAT32;
 				break;
 
 			case FLOAT64:
-				data = this.buffer.readDoubleBE(this.offset);
+				data = this.view.getFloat64(this.offset);
 				this.offset += SIZE_FLOAT64;
 				break;
 
@@ -127,29 +135,22 @@ export default class BufferReader {
 
 		let byteOffset = this.buffer.byteOffset + this.offset;
 		let buffer = this.buffer.buffer.slice(byteOffset, byteOffset + length);
+
 		this.offset += length;
 
 		switch (type) {
-			case UINT8:
-				return new Uint8Array(buffer);
-			case INT8:
-				return new Int8Array(buffer);
-			case UINT16:
-				return new Uint16Array(buffer);
-			case INT16:
-				return new Int16Array(buffer);
-			case UINT32:
-				return new Uint32Array(buffer);
-			case INT32:
-				return new Int32Array(buffer);
-			case FLOAT32:
-				return new Float32Array(buffer);
-			case FLOAT64:
-				return new Float64Array(buffer);
+			case UINT8:   return new Uint8Array(buffer);
+			case INT8:    return new Int8Array(buffer);
+			case UINT16:  return new Uint16Array(buffer);
+			case INT16:   return new Int16Array(buffer);
+			case UINT32:  return new Uint32Array(buffer);
+			case INT32:   return new Int32Array(buffer);
+			case FLOAT32: return new Float32Array(buffer);
+			case FLOAT64: return new Float64Array(buffer);
 		}
 	}
 
-	/* internal */
+	////////////////////////////////////////////////////////////////
 
 	nextNullAt() {
 		for (let i = this.offset; i < this.buffer.length; ++i) {

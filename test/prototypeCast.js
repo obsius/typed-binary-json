@@ -47,10 +47,13 @@ export default function(Tbjson, stringify, validateTypes) {
 	let typedX = Tbjson.cast(JSON.parse(stringify(x)), X);
 
 	let invalid = validateTypes(x, typedX);
-	if (invalid) { return invalid; }
 
-	return [
-		stringify(x),
-		stringify(tbjson.parseBuffer(tbjson.serializeToBuffer(x)))
-	];
+	if (invalid) {
+		return invalid;
+	} else {
+		return [
+			stringify(x),
+			stringify(tbjson.parseBuffer(tbjson.serializeToBuffer(x)))
+		];
+	}
 }

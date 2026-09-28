@@ -7,7 +7,7 @@ export default function flattenValidation(validationResult) {
 	return validationResult[1] > 0 ? flattenObj(validationResult[0]) : [];
 }
 
-/* internal */
+////////////////////////////////////////////////////////////////
 
 function flattenObj(obj, errors = [], path = []) {
 

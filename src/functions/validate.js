@@ -73,8 +73,7 @@ export default function validate(obj, prototype = null, options = {}, definition
 
 					// a null object must be marked nullable
 					} else {
-						errors = OBJECT;
-						errorCount++;
+						return [OBJECT, errorCount + 1];
 					}
 
 					break;
@@ -118,7 +117,7 @@ export default function validate(obj, prototype = null, options = {}, definition
 
 				// call the validate function for custom validation
 				if (prototype.tbjson.validate) {
-					return tbjson.validate(obj, options, errorCount);
+					return prototype.tbjson.validate(obj, options, errorCount);
 
 				// use the passed prototype
 				} else {
@@ -189,7 +188,7 @@ export default function validate(obj, prototype = null, options = {}, definition
 	}
 }
 
-/* internal */
+////////////////////////////////////////////////////////////////
 
 /**
  * Return true if the value passed is a typed array.
@@ -242,7 +241,7 @@ function validTypedValue(val, type, options = {}) {
 			return typeof val == 'number' && (Number.isNaN(val) ? !!options.allowNaN : val >= 0 && val <= 65535);
 
 		case INT32:
-			return typeof val == 'number' && (Number.isNaN(val) ? !!options.allowNaN : val >= -2147483648 && val < 2147483647);
+			return typeof val == 'number' && (Number.isNaN(val) ? !!options.allowNaN : val >= -2147483648 && val <= 2147483647);
 
 		case UINT32:
 			return typeof val == 'number' && (Number.isNaN(val) ? !!options.allowNaN : val >= 0 && val <= 4294967295);

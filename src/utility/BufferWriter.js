@@ -39,15 +39,17 @@ export default class BufferWriter {
 
 	constructor(size = DEFAULT_BUFFER_SIZE, xFactor = DEFAULT_X_FACTOR, strEncoding = DEFAULT_STR_ENCODING) {
 
-		this.buffer = Buffer.allocUnsafe(size);
 		this.xFactor = xFactor;
 		this.strEncoding = strEncoding;
 
-		if (strEncoding == 'asci') {
+		if (strEncoding == 'ascii') {
 			this.maxBytesPerChar = MAX_BYTES_PER_CHAR_ASCII;
 		} else {
 			this.maxBytesPerChar = MAX_BYTES_PER_CHAR_UNICODE;
 		}
+
+		this.buffer = Buffer.allocUnsafe(size);
+		this.view = new DataView(this.buffer.buffer, this.buffer.byteOffset, this.buffer.byteLength);
 	}
 
 	getBuffer() {
@@ -55,9 +57,12 @@ export default class BufferWriter {
 	}
 
 	grow(size) {
+
 		do {
-			this.buffer = Buffer.concat([this.buffer, Buffer.allocUnsafe(this.size * Math.floor(this.xFactor / 2))]);
+			this.buffer = Buffer.concat([this.buffer, Buffer.allocUnsafe(Math.max(Math.ceil(this.size * (this.xFactor - 1)), size || 0, 1))]);
 		} while (size && this.offset + size > this.size);
+
+		this.view = new DataView(this.buffer.buffer, this.buffer.byteOffset, this.buffer.byteLength);
 	}
 
 	write(type, val) {
@@ -183,8 +188,6 @@ export default class BufferWriter {
 		this.checkSize(val.length * this.maxBytesPerChar);
 		this.offset += this.buffer.write(val, this.offset, val.length * this.maxBytesPerChar, this.strEncoding);
 	}
-
-	/* internal */
 
 	checkSize(size) {
 		if (this.offset + size > this.buffer.length) {

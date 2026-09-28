@@ -49,7 +49,7 @@ import Prototype from './Prototype';
 
 import BufferReader from './utility/BufferReader';
 import BufferWriter from './utility/BufferWriter';
-import StreamBufferReader from './utility/StreamBufferReader';
+import Codecs from './utility/Codecs';
 import StreamBufferWriter from './utility/StreamBufferWriter';
 import getParent from './utility/getParent';
 
@@ -111,8 +111,13 @@ export default class Tbjson {
 		bufferSize: DEFAULT_BUFFER_SIZE,
 		numEncoding: DEFAULT_NUM_ENCODING,
 		strEncoding: DEFAULT_STR_ENCODING,
-		xFactor: DEFAULT_X_FACTOR
+		xFactor: DEFAULT_X_FACTOR,
+		codegen: true
 	};
+
+	#codecs = null;
+	#parseField;
+	#serializeField;
 	
 	constructor(types = [], prototypes = [], offsets = {}, options = {}) {
 
@@ -128,12 +133,70 @@ export default class Tbjson {
 
 		this.nextProtoCode = this.offsets.prototype;
 
+		this.#codecs = new Codecs(this.options.codegen, (def) => {
+
+			let { offsets } = this;
+			let codecs = this.#codecs;
+			let fields = [];
+
+			// the parser of a prototype with an object definition, null for any other code
+			let nested = (code) => {
+				let proto = (code >= offsets.prototype && code < offsets.nullablePrototype) ? this.protos[code] : null;
+				return (proto?.definition && !Array.isArray(proto.definition)) ? () => codecs.parser(proto.definition, proto.prototype, proto.prototype?.tbjson?.build) : null;
+			};
+
+			for (let key in def) {
+
+				let type = def[key];
+				let field = { key, code: null, nullable: false, def: type, parser: null };
+
+				if (typeof type == 'number') {
+
+					// primitive, inline when it has a read
+					if (type < NULLABLE_OFFSET) {
+						field.code = codecs.inline(type) ? type : null;
+
+					// nullable primitive, inline unless a legacy file leaves the null byte to the ladder, the ladder writes what is inside
+					} else if (type < TYPED_ARRAY_OFFSET) {
+						if (this.version >= 1 && codecs.inline(type - NULLABLE_OFFSET)) {
+							field.code = type - NULLABLE_OFFSET;
+							field.nullable = true;
+							field.def = type - NULLABLE_OFFSET;
+						}
+
+					// prototype, straight to its parser when it has an object definition
+					} else if (type >= offsets.prototype && type < offsets.nullablePrototype) {
+						field.parser = nested(type);
+
+					// nullable typed array, type or prototype: the null byte inline, then its parser or the ladder
+					} else if (type >= offsets.nullablePrototype && type < offsets.array) {
+						field.nullable = true;
+						field.def = type - offsets.nullablePrototype;
+						field.parser = nested(field.def);
+					}
+
+					// typed arrays, types, arrays and uniform objects go through the ladder as they are
+
+				// object definition, straight to its parser
+				} else if (!Array.isArray(type)) {
+					field.parser = () => codecs.parser(type);
+				}
+
+				fields.push(field);
+			}
+
+			return fields;
+		});
+
+		this.#parseField = this.#parse.bind(this);
+		this.#serializeField = this.#serializeDef.bind(this);
+
 		this.registerTypes(types);
 		this.registerPrototypes(prototypes);
 	}
 
-	/*-----------------------------------------------------------------------*/
-	/* registers */
+	////////////////////////////////////////////////////////////////
+	// registers
 
 	/**
 	 * Register a variable definition so that any prototypes with the same variable definition id are replaced before serializing.
@@ -144,7 +207,8 @@ export default class Tbjson {
 	registerVariableDef(id, def) {
 
 		// format the definition
-		def = def ? this.fmtDef(def) : null;
+		def = def ? this.#fmtDef(def) : null;
+
 		if (def == ERROR) {
 			throw new Error(`Invalid definition for variable: ${id}`);
 		}
@@ -168,7 +232,8 @@ export default class Tbjson {
 		}
 
 		// format the definition
-		def = def ? this.fmtDef(def) : null;
+		def = def ? this.#fmtDef(def) : null;
+
 		if (def == ERROR) {
 			throw new Error(`Invalid definition for variable: ${id}`);
 		}
@@ -227,9 +292,11 @@ export default class Tbjson {
 			// check if it's a known tbjson prototype
 			if (prototype.tbjson) {
 
-				// TODO: REMOVE THIS
-				if (!prototype.tbjson.definition) {
-					throw new Error(`Missing definition for "${prototype.name}"`);
+				// already registered, and with its definition if it has one
+				let code = this.protoRefs[prototype.tbjson.reference || prototype.name];
+
+				if (code && this.protos[code] && (this.protos[code].definition || !prototype.tbjson.definition)) {
+					return code;
 				}
 
 				prototype = {
@@ -267,7 +334,8 @@ export default class Tbjson {
 			}
 
 			// format the definition
-			let definition = prototype.definition ? this.fmtDef(prototype.definition) : null;
+			let definition = prototype.definition ? this.#fmtDef(prototype.definition) : null;
+
 			if (definition == ERROR) {
 				throw new Error(`Invalid definition for: ${prototype.prototype.name}`);
 			}
@@ -399,8 +467,8 @@ export default class Tbjson {
 		this.finalized = true;
 	}
 
-	/*-----------------------------------------------------------------------*/
-	/* serializers */
+	////////////////////////////////////////////////////////////////
+	// serializers
 
 	/**
 	 * Serialize the obj to a buffer.  Fastest, but uses the most memory.
@@ -410,13 +478,13 @@ export default class Tbjson {
 	serializeToBuffer(obj) {
 		try {
 
-			this.processVariableDefs();
+			this.#processVariableDefs();
 
 			// make a writer
 			this.writer = new BufferWriter(this.options.bufferSize, this.options.xFactor, this.options.strEncoding);
 
 			// process the obj
-			this.root = this.serialize(obj);
+			this.#serializeRoot(obj);
 
 			// add the header to the front
 			return Buffer.concat([this.getHeaderAsBuffer(), this.writer.getBuffer()]);
@@ -436,13 +504,13 @@ export default class Tbjson {
 	serializeToStream(stream, obj) {
 		try {
 
-			this.processVariableDefs();
+			this.#processVariableDefs();
 
 			// make a writer
 			this.writer = new StreamBufferWriter(stream, this.options.bufferSize, this.options.xFactor, this.options.strEncoding);
 
 			// process the obj
-			this.root = this.serialize(obj);
+			this.#serializeRoot(obj);
 			
 			// flush and cleanup
 			this.writer.flush();
@@ -464,31 +532,28 @@ export default class Tbjson {
 		return new Promise((res, rej) => {
 			try {
 
-				this.processVariableDefs();
+				this.#processVariableDefs();
 
 				let tempFilename = `${filename}.tmp`;
 
-				// write the data to a tmp file
-				let writeStream = fs.createWriteStream(tempFilename, 'binary');
-				this.serializeToStream(writeStream, obj);
-				writeStream.end();
+				// write the data to a tmp file, the header is only known once it is written
+				let tempStream = fs.createWriteStream(tempFilename, 'binary');
+				tempStream.on('error', rej);
+				this.serializeToStream(tempStream, obj);
 
-				// write the final file
-				writeStream = fs.createWriteStream(filename, 'binary');
+				// once it has landed, the final file: the header, then the tmp file after it
+				tempStream.end(() => {
 
-				// write the header
-				writeStream.write(this.getHeaderAsBuffer());
+					let writeStream = fs.createWriteStream(filename, 'binary');
+					writeStream.on('error', rej);
+					writeStream.write(this.getHeaderAsBuffer());
 
-				// pipe the tmp file to the final file
-				let readStream = fs.createReadStream(tempFilename, 'binary');
-				readStream.pipe(writeStream);
+					fs.createReadStream(tempFilename, 'binary').on('error', rej).pipe(writeStream);
 
-				readStream.on('end', () => {
-
-					// cleanup
-					fs.unlinkSync(tempFilename);
-
-					res();
+					writeStream.on('finish', () => {
+						fs.unlinkSync(tempFilename);
+						res();
+					});
 				});
 			} catch (e) {
 				e.message = `Tbjson Failed to serialize object to "${filename}": ` + e.message;
@@ -497,8 +562,8 @@ export default class Tbjson {
 		});
 	}
 
-	/*-----------------------------------------------------------------------*/
-	/* parsers */
+	////////////////////////////////////////////////////////////////
+	// parsers
 	
 	/**
 	 * Parse a TBJSON containing buffer into ab object. Fastest, but uses the most memory.
@@ -528,9 +593,9 @@ export default class Tbjson {
 
 			// construct the object
 			if (selector) {
-				return this.parseAtSelection(this.root, selector);
+				return this.#parseAtSelection(this.root, selector);
 			} else {
-				return this.parse(this.root);
+				return this.#parse(this.root);
 			}
 
 		} catch(e) {
@@ -540,34 +605,25 @@ export default class Tbjson {
 	}
 
 	/**
-	 * TODO
-	 * Parse a TBJSON containing stream into an object. Slower, but uses the least memory.
+	 * Parse a TBJSON containing stream into an object. The stream is read into memory whole, then parsed as a buffer.
 	 * 
 	 * @param { stream } stream - stream to read from
 	 * @param { array } selector - anarray that indicates the selected object path
 	 */
 	parseStream(stream, selector = null) {
-		return new Promise(async (res, rej) => {
+		return new Promise((res, rej) => {
 
-			this.reader = new StreamBufferReader(stream);
+			let chunks = [];
 
-			// validate the stream type
-			if (await this.reader.readFixedLengthString(SIZE_MAGIC_NUMBER) != MAGIC_NUMBER) {
-				rej(new Error('Stream is not a Typed Binary JSON format'));
-			}
-
-			// get the header length
-			let headerLength = await this.reader.read(UINT32);
-
-			// read and parse the header
-			this.parseHeader(await this.reader.readFixedLengthString(headerLength));
-
-			// construct the object
-			if (selector) {
-				res(await this.parseAtSelection(this.root, selector));
-			} else {
-				res(await this.parse(this.root));
-			}
+			stream.on('data', (chunk) => chunks.push(chunk));
+			stream.on('error', rej);
+			stream.on('end', () => {
+				try {
+					res(this.parseBuffer(Buffer.concat(chunks), selector));
+				} catch (e) {
+					rej(e);
+				}
+			});
 		});
 	}
 
@@ -587,7 +643,7 @@ export default class Tbjson {
 	}
 
 	/**
-	 * Parse a TBJSON file into the object it represents. Slower, but uses less memory.
+	 * Parse a TBJSON file into the object it represents. The file is read into memory whole, then parsed as a buffer.
 	 * 
 	 * @param { string } filename - filename / path to read from
 	 * @param { array } selector - anarray that indicates the selected object path
@@ -601,8 +657,8 @@ export default class Tbjson {
 		}
 	}
 
-	/*-----------------------------------------------------------------------*/
-	/* helpers */
+	////////////////////////////////////////////////////////////////
+	// helpers
 
 	/**
 	 * Get the header object after serialization.
@@ -651,7 +707,7 @@ export default class Tbjson {
 			buffer.writeFixedLengthString(MAGIC_NUMBER);
 
 			// uint32 - header length
-			buffer.write(UINT32, Buffer.byteLength(headerStr, this.strEncoding));
+			buffer.write(UINT32, Buffer.byteLength(headerStr));
 
 			// str - header
 			buffer.writeFixedLengthString(headerStr);
@@ -723,16 +779,16 @@ export default class Tbjson {
 		}
 	}
 
-	/*-----------------------------------------------------------------------*/
-	/* internal */
+	////////////////////////////////////////////////////////////////
+	// internal
 
 	/**
 	 * Process all prototype definitions and variable definitions.
 	 */
-	processVariableDefs() {
+	#processVariableDefs() {
 		for (let code in this.protos) {
 			if (this.protos[code].definition) {
-				this.protos[code].definition = this.replaceVariableDefs(this.protos[code].definition);
+				this.protos[code].definition = this.#replaceVariableDefs(this.protos[code].definition);
 			}
 		}
 	}
@@ -742,7 +798,7 @@ export default class Tbjson {
 	 * 
 	 * @param { obj } def - the definition to check and replace 
 	 */
-	replaceVariableDefs(def) {
+	#replaceVariableDefs(def) {
 		if (typeof def == 'object') {
 
 			// an array, could be a variable definition
@@ -768,7 +824,7 @@ export default class Tbjson {
 						case NULLABLE:
 						case OBJECT:
 							
-							def[1] = this.replaceVariableDefs(def[1]);
+							def[1] = this.#replaceVariableDefs(def[1]);
 							
 							return def;
 					}
@@ -776,14 +832,14 @@ export default class Tbjson {
 
 				// a fixed-length array
 				for (let i = 0; i < def.length; ++i) {
-					def[i] = this.replaceVariableDefs(def[i]);
+					def[i] = this.#replaceVariableDefs(def[i]);
 				}
 
 			// a definition
 			} else {
 
 				for (let key in def) {
-					def[key] = this.replaceVariableDefs(def[key]);
+					def[key] = this.#replaceVariableDefs(def[key]);
 				}
 			}
 		}
@@ -802,7 +858,7 @@ export default class Tbjson {
 	 * 
 	 * @param { object | array | number } def - the definition specifying how to decode the binary data
 	 */
-	fmtDef(def, depth = 0, insideOf = 0) {
+	#fmtDef(def, depth = 0, insideOf = 0) {
 
 		switch (typeof def) {
 
@@ -851,12 +907,12 @@ export default class Tbjson {
 
 						// array
 						if (def[0] == ARRAY) {
-							return this.offsets.array + this.fmtDef(def[1], depth + 1, ARRAY);
+							return this.offsets.array + this.#fmtDef(def[1], depth + 1, ARRAY);
 
 						// nullable
 						} else if (def[0] == NULLABLE) {
 
-							let subDef = this.fmtDef(def[1], depth + 1, NULLABLE);
+							let subDef = this.#fmtDef(def[1], depth + 1, NULLABLE);
 
 							// primitive
 							if (subDef < NULLABLE_OFFSET) {
@@ -869,11 +925,11 @@ export default class Tbjson {
 
 						// primitive typed array
 						} else if (def[0] == TYPED_ARRAY) {
-							return TYPED_ARRAY_OFFSET + this.fmtDef(def[1], depth + 1, TYPED_ARRAY);
+							return TYPED_ARRAY_OFFSET + this.#fmtDef(def[1], depth + 1, TYPED_ARRAY);
 
 						// object
 						} else if (def[0] == OBJECT) {
-							return this.offsets.object + this.fmtDef(def[1], depth + 1, OBJECT);
+							return this.offsets.object + this.#fmtDef(def[1], depth + 1, OBJECT);
 
 						// variable def
 						} else if (def[0] == VARIABLE_DEF) {
@@ -896,7 +952,7 @@ export default class Tbjson {
 						let fmtDef = new Array(def.length);
 
 						for (let i = 0; i < def.length; ++i) {
-							fmtDef[i] = this.fmtDef(def[i], depth + 1);
+							fmtDef[i] = this.#fmtDef(def[i], depth + 1);
 						}
 
 						// inside of an array or object, register def and return matching code
@@ -919,7 +975,7 @@ export default class Tbjson {
 					let fmtDef = {};
 
 					for (let key in def) {
-						fmtDef[key] = this.fmtDef(def[key], depth + 1);
+						fmtDef[key] = this.#fmtDef(def[key], depth + 1);
 					}
 
 					return fmtDef;
@@ -941,13 +997,19 @@ export default class Tbjson {
 	 * @param { object | array | number } def - the definition specifying how to decode the binary data
 	 * @param { bool } isArray - special case for an unknown def that is an array
 	 */
-	serializeDef(obj, def, isArray) {
+	#serializeDef(obj, def, isArray) {
 
 		// no def, could be a known but undefined prototype, or a plain object, kick back to the serializer
 		if (!def) {
 
 			// write the code
 			let code = this.nextObjCode++;
+
+			// too big for our u16
+			if (code > 65535) {
+				throw new Error('Too many unknown objects for one serialization');
+			}
+
 			this.writer.write(UINT16, code);
 
 			let ref;
@@ -958,7 +1020,7 @@ export default class Tbjson {
 				ref = new Array(obj.length);
 
 				for (let i = 0; i < obj.length; ++i) {
-					ref[i] = this.serialize(obj[i]);
+					ref[i] = this.#serialize(obj[i]);
 				}
 				
 			// write the obj
@@ -967,7 +1029,7 @@ export default class Tbjson {
 				ref = {};
 
 				for (let key in obj) {
-					ref[key] = this.serialize(obj[key]);
+					ref[key] = this.#serialize(obj[key]);
 				}
 			}
 
@@ -986,11 +1048,11 @@ export default class Tbjson {
 
 					// an unknown object
 					if (def == OBJECT) {
-						this.serializeDef(obj);
+						this.#serializeDef(obj);
 
 					// an unknown array
 					} else if (def == ARRAY) {
-						this.serializeDef(obj, null, true);
+						this.#serializeDef(obj, null, true);
 
 					// primitive
 					} else {
@@ -1004,13 +1066,13 @@ export default class Tbjson {
 						this.writer.write(NULL);
 					} else {
 						this.writer.write(BOOL, true);
-						this.serializeDef(obj, def - NULLABLE_OFFSET);
+						this.#serializeDef(obj, def - NULLABLE_OFFSET);
 					}
 
 				// primitive typed array
 				} else if (def < TYPE_OFFSET) {
-					this.writer.write(UINT32, obj.buffer.byteLength);
-					this.writer.writeBuffer(Buffer.from(obj.buffer));
+					this.writer.write(UINT32, obj.byteLength);
+					this.writer.writeBuffer(Buffer.from(obj.buffer, obj.byteOffset, obj.byteLength));
 
 				// type
 				} else if (def < this.offsets.prototype) {
@@ -1031,7 +1093,7 @@ export default class Tbjson {
 				} else if (def < this.offsets.nullablePrototype) {
 
 					if (obj == null || typeof obj != 'object') {
-						throw new Error(`Null objects cannot be passed into known prototypes, mark as a nullable known prototype instead: ${this.protos[def] ? this.protos[def].prototype : def}`);
+						throw new Error(`Null objects cannot be passed into known prototypes, mark as a nullable known prototype instead: ${this.protos[def]?.prototype ?? def}`);
 					}
 
 					// known prototype
@@ -1046,7 +1108,7 @@ export default class Tbjson {
 						}
 					}
 
-					this.serializeDef(obj, this.protos[def].definition);
+					this.#serializeDef(obj, this.protos[def].definition);
 
 				// nullable type or prototype
 				} else if (def < this.offsets.array) {
@@ -1056,7 +1118,7 @@ export default class Tbjson {
 						this.writer.write(NULL);
 					} else {
 						this.writer.write(BOOL, true);
-						this.serializeDef(obj, def - this.offsets.nullablePrototype);
+						this.#serializeDef(obj, def - this.offsets.nullablePrototype);
 					}
 
 				// variable-length fixed typed array 
@@ -1069,7 +1131,7 @@ export default class Tbjson {
 						this.writer.write(UINT32, obj.length);
 
 						for (let i = 0; i < obj.length; ++i) {
-							this.serializeDef(obj[i], def - this.offsets.array);
+							this.#serializeDef(obj[i], def - this.offsets.array);
 						}
 
 					// if not valid, auto-cast into an empty array
@@ -1089,7 +1151,7 @@ export default class Tbjson {
 						// write out the keys and values
 						for (let key in obj) {
 							this.writer.write(STRING, key);
-							this.serializeDef(obj[key], def - this.offsets.object);
+							this.#serializeDef(obj[key], def - this.offsets.object);
 						}
 
 					// if not valid, auto-cast into an empty object
@@ -1106,14 +1168,12 @@ export default class Tbjson {
 				// fixed-length variable type array
 				if (Array.isArray(def)) {
 					for (let i = 0; i < def.length; ++i) {
-						this.serializeDef(obj[i], def[i]);
+						this.#serializeDef(obj[i], def[i]);
 					}
 
 				// object
 				} else {
-					for (let key in def) {
-						this.serializeDef(obj[key], def[key]);
-					}
+					this.#codecs.serializer(def)(this.#serializeField, this.writer, obj);
 				}
 
 				break;
@@ -1124,13 +1184,26 @@ export default class Tbjson {
 		}
 	}
 
+	////////////////////////////////////////////////////////////////
+
+	/**
+	 * The root serialized into the writer. The unknown objects are this serialization's alone.
+	 * 
+	 * @param { object } obj - the object to serialize
+	 */
+	#serializeRoot(obj) {
+		this.objs = {};
+		this.nextObjCode = 0;
+		this.root = this.#serialize(obj);
+	}
+
 	/**
 	 * Serialize an object. Can be known (TBJSON has a definition for it) or plain (Class or object that TBJSON doesn't have a definition for).
 	 * Calls serializeDef() if a known type is found.
 	 * 
 	 * @param { object } obj - the object to serialize
 	 */
-	serialize(obj) {
+	#serialize(obj) {
 		switch (typeof obj) {
 
 			// bool
@@ -1161,7 +1234,7 @@ export default class Tbjson {
 					let refs = new Array(obj.length);
 
 					for (let i = 0; i < obj.length; ++i) {
-						refs[i] = this.serialize(obj[i]);
+						refs[i] = this.#serialize(obj[i]);
 					}
 
 					return refs;
@@ -1190,8 +1263,8 @@ export default class Tbjson {
 					}
 
 					if (ref) {
-						this.writer.write(UINT32, obj.buffer.byteLength);
-						this.writer.writeBuffer(Buffer.from(obj.buffer));
+						this.writer.write(UINT32, obj.byteLength);
+						this.writer.writeBuffer(Buffer.from(obj.buffer, obj.byteOffset, obj.byteLength));
 					}
 
 					return ref;
@@ -1213,7 +1286,7 @@ export default class Tbjson {
 							}
 
 							// process the prototype definition
-							this.serializeDef(obj, this.protos[code].definition);
+							this.#serializeDef(obj, this.protos[code].definition);
 
 							return code;
 						}
@@ -1224,7 +1297,7 @@ export default class Tbjson {
 					let ref = {};
 
 					for (let key in obj) {
-						ref[key] = this.serialize(obj[key]);
+						ref[key] = this.#serialize(obj[key]);
 					}
 
 					return ref;
@@ -1235,42 +1308,57 @@ export default class Tbjson {
 	/**
 	 * Parse a definition, but only return the portion that matches the selector.
 	 * 
-	 * TODO: IMPLEMENT NULL READER TO SKIP ENTRIES FOR PERFORMANCE
-	 * 
 	 * @param { object | array | number } def - the definition specifying how to decode the binary data
-	 * @param { array } selector - quit early and return the value selected by this
+	 * @param { array } selector - the keys and indices leading to the selected value
+	 * @param { number } [depth] - how far along the selector this definition is
 	 */
-	parseAtSelection(def, selector, path = [], prototype) {
+	#parseAtSelection(def, selector, depth = 0) {
 
-		// forward a plain object
-		if (typeof def == 'number' && def == OBJECT) {
-			return this.parseAtSelection(this.objs[this.reader.read(UINT16)], selector, path);
+		// the selected value
+		if (depth == selector.length) {
+			return this.#parse(def);
+		}
+
+		let selection = selector[depth];
+
+		// forward an unknown object or array
+		if (typeof def == 'number' && (def == OBJECT || def == ARRAY)) {
+			return this.#parseAtSelection(this.objs[this.reader.read(UINT16)], selector, depth);
 
 		// forward a known prototype
-		} else if (typeof def == 'number' && def >= this.offsets.prototype && def < this.offsets.array) {
+		} else if (typeof def == 'number' && def >= this.offsets.prototype && def < this.offsets.nullablePrototype) {
 			let proto = this.protos[def];
-			return this.parseAtSelection(proto.definition ? proto.definition : this.objs[this.reader.read(UINT16)], selector, path, proto.prototype);
-			
-		// control the object path
-		} else if (typeof def == 'object' && !Array.isArray(def)) {
+			return this.#parseAtSelection(proto.definition ? proto.definition : this.objs[this.reader.read(UINT16)], selector, depth);
 
-			let selection = selector.shift();
+		// forward a nullable typed array, type or prototype
+		} else if (typeof def == 'number' && def >= this.offsets.nullablePrototype && def < this.offsets.array) {
+			return this.reader.read(UINT8) ? this.#parseAtSelection(def - this.offsets.nullablePrototype, selector, depth) : null;
+
+		// control the array path
+		} else if (Array.isArray(def)) {
+
+			for (let i = 0; i < def.length; ++i) {
+				if (i == selection) {
+					return this.#parseAtSelection(def[i], selector, depth + 1);
+				}
+
+				this.#parse(def[i]);
+			}
+
+		// control the object path
+		} else if (typeof def == 'object') {
 
 			for (let key in def) {
 				if (key == selection) {
-					if (!selector.length) {
-						return this.parse(def[key], prototype);
-					} else {
-						return this.parseAtSelection(def[key], selector, path.concat([selection]));
-					}
+					return this.#parseAtSelection(def[key], selector, depth + 1);
 				}
 
-				this.parse(def[key]);
+				this.#parse(def[key]);
 			}
 
 		// read to the void
 		} else {
-			this.parse(def);
+			this.#parse(def);
 		}
 
 		return null;
@@ -1282,7 +1370,7 @@ export default class Tbjson {
 	 * @param { object | array | number } def - the definition specifying how to decode the binary data
 	 * @param { function } [prototype] - create this type during object instantiation
 	 */
-	parse(def, prototype) {
+	#parse(def, prototype) {
 
 		// type
 		if (typeof def == 'number') {
@@ -1296,7 +1384,7 @@ export default class Tbjson {
 
 				// unknown object or array
 				} else if (def == OBJECT || def == ARRAY) {
-					return this.parse(this.objs[this.reader.read(UINT16)]);
+					return this.#parse(this.objs[this.reader.read(UINT16)]);
 
 				// primitive
 				} else {
@@ -1313,7 +1401,7 @@ export default class Tbjson {
 					if (this.version < 1) {
 						return this.reader.read(def - NULLABLE_OFFSET);
 					} else {
-						return this.parse(def - NULLABLE_OFFSET);
+						return this.#parse(def - NULLABLE_OFFSET);
 					}
 
 				// null
@@ -1352,7 +1440,7 @@ export default class Tbjson {
 			} else if (def < this.offsets.nullablePrototype) {
 
 				let proto = this.protos[def];
-				return this.parse(proto.definition ? proto.definition : this.objs[this.reader.read(UINT16)], proto.prototype);
+				return this.#parse(proto.definition ? proto.definition : this.objs[this.reader.read(UINT16)], proto.prototype);
 
 			// nullable typed array / type / prototype
 			} else if (def < this.offsets.array) {
@@ -1362,16 +1450,17 @@ export default class Tbjson {
 					return null;
 				}
 
-				return this.parse(def - this.offsets.nullablePrototype);
+				return this.#parse(def - this.offsets.nullablePrototype);
 
 			// variable-length fixed typed array 
 			} else if (def < this.offsets.object) {
 
 				let length = this.reader.read(UINT32);
 				let objs = new Array(length);
+				let read = this.#elementParser(def - this.offsets.array);
 
 				for (let i = 0; i < length; ++i) {
-					objs[i] = this.parse(def - this.offsets.array);
+					objs[i] = read();
 				}
 
 				return objs;
@@ -1381,9 +1470,10 @@ export default class Tbjson {
 
 				let length = this.reader.read(UINT32);
 				let obj = {};
+				let read = this.#elementParser(def - this.offsets.object);
 
 				for (let i = 0; i < length; ++i) {
-					obj[this.parse(STRING)] = this.parse(def - this.offsets.object);
+					obj[this.reader.read(STRING)] = read();
 				}
 
 				return obj;
@@ -1395,26 +1485,34 @@ export default class Tbjson {
 			let objs = new Array(def.length);
 
 			for (let i = 0; i < def.length; ++i) {
-				objs[i] = this.parse(def[i]);
+				objs[i] = this.#parse(def[i]);
 			}
 
 			return objs;
 
 		// object
 		} else {
+			return this.#codecs.parser(def, prototype, prototype?.tbjson?.build)(this.#parseField, this.reader);
+		}
+	}
 
-			let obj = prototype ? new prototype() : {};
+	/**
+	 * A parser for many values of one code.
+	 * A prototype with an object definition straight to its parser, a primitive straight off the reader, anything else through the ladder.
+	 * 
+	 * @param { number } code - the code of every value
+	 */
+	#elementParser(code) {
 
-			for (let key in def) {
-				obj[key] = this.parse(def[key]);
-			}
+		let proto = (code >= this.offsets.prototype && code < this.offsets.nullablePrototype) ? this.protos[code] : null;
 
-			// call the build function for post construction
-			if (prototype && prototype.tbjson && prototype.tbjson.build) {
-				prototype.tbjson.build(obj);
-			}
-
-			return obj;
+		if (proto?.definition && !Array.isArray(proto.definition)) {
+			let parser = this.#codecs.parser(proto.definition, proto.prototype, proto.prototype?.tbjson?.build);
+			return () => parser(this.#parseField, this.reader);
+		} else if (code < NULLABLE_OFFSET && code != NULL && code != OBJECT && code != ARRAY) {
+			return () => this.reader.read(code);
+		} else {
+			return () => this.#parse(code);
 		}
 	}
 }

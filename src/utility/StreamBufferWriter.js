@@ -10,8 +10,6 @@ export default class StreamBufferWriter extends BufferWriter {
 		this.stream = stream;
 	}
 
-	/* internal */
-
 	flush() {
 
 		this.streamReady = this.stream.write(this.buffer.slice(this.streamIndex, this.offset), () => {
@@ -28,13 +26,10 @@ export default class StreamBufferWriter extends BufferWriter {
 		return this.streamReady;
 	}
 
+	// flush what is written when the stream can take it, grow only when it cannot or the value would not fit anyway
 	checkSize(size) {
-		if (this.offset + size > this.size) {
-			if (this.streamReady && !this.flush()) {
-				this.grow();
-			} else {
-				this.grow();
-			}
+		if (this.offset + size > this.size && (!this.streamReady || !this.flush() || this.offset + size > this.size)) {
+			this.grow(size);
 		}
 	}
 }

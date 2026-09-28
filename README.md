@@ -240,7 +240,7 @@ Parse the `buffer`. Return the parsed object.
 
 **parseStream(stream)**
 
-Parse the `stream`. Return the parsed object.
+Read the `stream` into memory whole, then parse it. Return a promise of the parsed object.
 
 **parseFileAsBuffer(filename)**
 
@@ -248,7 +248,7 @@ Read the file `filename` into memory and parse its conents. Preferred for perfor
 
 **parseFileAsStream(filename)**
 
-Create a read stream for `filename` and parse its contents. Useful for very large files, but slower. Return the parsed object.
+Create a read stream for `filename`, read it into memory whole, then parse it. Return a promise of the parsed object.
 
 ### Registrations
 
@@ -422,6 +422,10 @@ Tbjson.serialize(x);
 // {  a: 'a' }
 ```
 
+## Browser
+
+Bundlers pick the browser build through the `browser` field: the same code with a `Buffer` polyfill bundled in and no file system, so the file methods throw.
+
 ## Performance
 
 Performance varies on the data type, but you'll get best performance if your types have lots of numeric values, and even better performance if you can take advantage of `float32`, `int32`, `int16`, and `int8` to save space.  
@@ -452,12 +456,16 @@ Performance varies on the data type, but you'll get best performance if your typ
 }
 ```
 
+Node 24 on a Ryzen 7 9800X3D, each operation after a full collection.  
+  
 Benchmark    | Filesize | Time
 ---          | ---      | ---
-JSON Write   | 140 MB   | 2,648 ms
-TBJSON Write | 37 MB    | 1,154 ms
-JSON Read    | N/A      | 2,073 ms
-TBJSON Read  | N/A      | 1,453 ms
+JSON Write   | 137 MB   | 351 ms
+TBJSON Write | 36 MB    | 235 ms
+JSON Read    | N/A      | 437 ms
+TBJSON Read  | N/A      | 209 ms
+
+Benchmark code can be found in `test/benchmarks.js`, run with `npm run benchmarks`, or `CODEGEN=0 npm run benchmarks` for the interpretive loops.
 
 ## Contributing
 

@@ -1,2 +1,0 @@
-- go through TODOs
-- check max object value (uint16 currently)
